@@ -90,6 +90,26 @@ export default function AdminProductsPage() {
         setVariations(variations.filter((_, i) => i !== index));
     };
 
+    const handleImageUpload = async (file: File) => {
+        if (file.size > 2 * 1024 * 1024) {
+            alert('Arquivo muito grande! Máximo: 2MB');
+            return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (res.ok && data.url) {
+                setFormData(p => ({ ...p, image_url: data.url }));
+            } else {
+                alert(data.error || 'Erro ao fazer upload');
+            }
+        } catch {
+            alert('Erro ao fazer upload');
+        }
+    };
+
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -334,8 +354,53 @@ export default function AdminProductsPage() {
                                 )}
 
                                 <div className="form-group" style={{ marginTop: '16px' }}>
-                                    <label className="form-label">URL da Imagem</label>
-                                    <input type="url" className="form-input" value={formData.image_url} onChange={e => setFormData(p => ({ ...p, image_url: e.target.value }))} />
+                                    <label className="form-label">Imagem do Produto (máx. 2MB)</label>
+                                    <div style={{
+                                        border: '2px dashed var(--border)',
+                                        borderRadius: '12px',
+                                        padding: '20px',
+                                        textAlign: 'center',
+                                        background: 'rgba(255,255,255,0.02)',
+                                        cursor: 'pointer',
+                                        position: 'relative',
+                                        transition: 'border-color 0.2s',
+                                    }}
+                                        onClick={() => document.getElementById('product-image-input')?.click()}
+                                        onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent-gold)'; }}
+                                        onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
+                                        onDrop={async e => {
+                                            e.preventDefault();
+                                            e.currentTarget.style.borderColor = 'var(--border)';
+                                            const file = e.dataTransfer.files?.[0];
+                                            if (file) await handleImageUpload(file);
+                                        }}
+                                    >
+                                        {formData.image_url ? (
+                                            <div style={{ position: 'relative', display: 'inline-block' }}>
+                                                <img src={formData.image_url} alt="Preview" style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', objectFit: 'cover' }} />
+                                                <button type="button" onClick={e => { e.stopPropagation(); setFormData(p => ({ ...p, image_url: '' })); }} style={{
+                                                    position: 'absolute', top: '-8px', right: '-8px',
+                                                    background: 'var(--danger)', color: '#fff', border: 'none',
+                                                    borderRadius: '50%', width: '24px', height: '24px',
+                                                    cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}>✕</button>
+                                            </div>
+                                        ) : (
+                                            <div style={{ color: 'var(--text-muted)' }}>
+                                                <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📷</div>
+                                                <div style={{ fontSize: '0.9rem' }}>Clique ou arraste uma imagem aqui</div>
+                                                <div style={{ fontSize: '0.75rem', marginTop: '4px', color: 'var(--text-muted)' }}>JPG, PNG, WebP ou GIF • Máximo 2MB</div>
+                                            </div>
+                                        )}
+                                        <input id="product-image-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif"
+                                            style={{ display: 'none' }}
+                                            onChange={async e => {
+                                                const file = e.target.files?.[0];
+                                                if (file) await handleImageUpload(file);
+                                                e.target.value = '';
+                                            }}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '24px' }}>
