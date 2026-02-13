@@ -11,7 +11,7 @@ export async function GET() {
             orderBy: { created_at: 'desc' },
         });
 
-        return NextResponse.json(orders.map(o => ({
+        return NextResponse.json(orders.map((o: any) => ({
             ...o,
             total: Number(o.total),
             product_name: o.product?.name || 'N/A',

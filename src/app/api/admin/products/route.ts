@@ -11,10 +11,10 @@ export async function GET() {
             orderBy: { created_at: 'desc' },
         });
 
-        return NextResponse.json(products.map(p => ({
+        return NextResponse.json(products.map((p: any) => ({
             ...p,
             price: Number(p.price),
-            variations: p.variations.map(v => ({
+            variations: p.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             ...product,
             price: Number(product.price),
-            variations: product.variations.map(v => ({
+            variations: product.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
@@ -122,7 +122,7 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({
             ...updated,
             price: Number(updated!.price),
-            variations: updated!.variations.map(v => ({
+            variations: updated!.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
