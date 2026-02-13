@@ -11,7 +11,7 @@ export async function GET() {
             orderBy: { created_at: 'desc' },
         });
 
-        return NextResponse.json(credentials.map(c => ({
+        return NextResponse.json(credentials.map((c: any) => ({
             ...c,
             product: c.product ? { ...c.product, price: Number(c.product.price) } : null,
             variation: c.variation ? { ...c.variation, price: Number(c.variation.price), original_price: c.variation.original_price ? Number(c.variation.original_price) : null } : null,
