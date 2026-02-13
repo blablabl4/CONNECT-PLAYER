@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { supabase } from '@/lib/supabase';
+
 
 interface Order {
     id: string;
@@ -31,38 +31,28 @@ export default function AdminOrdersPage() {
 
     async function fetchOrders() {
         try {
-            const { data, error } = await supabase
-                .from('orders')
-                .select('*, product:products(name)')
-                .order('created_at', { ascending: false });
-
-            if (data && !error) {
-                setOrders(data.map(o => ({
-                    ...o,
-                    product_name: (o.product as unknown as { name: string })?.name || 'N/A',
-                })));
+            const res = await fetch('/api/admin/orders');
+            if (res.ok) {
+                const data = await res.json();
+                setOrders(data);
                 return;
             }
         } catch {
-            // Demo
+            // fallback
         }
-        setOrders([
-            { id: '1', customer_name: 'João Silva', customer_email: 'joao@email.com', customer_whatsapp: '11999999999', product_name: 'Netflix Premium', total: 19.90, status: 'paid', created_at: new Date().toISOString() },
-            { id: '2', customer_name: 'Maria Santos', customer_email: 'maria@email.com', customer_whatsapp: '11988888888', product_name: 'Spotify Premium', total: 9.90, status: 'delivered', created_at: new Date().toISOString() },
-            { id: '3', customer_name: 'Pedro Costa', customer_email: 'pedro@email.com', customer_whatsapp: '', product_name: 'IPTV Full HD', total: 29.90, status: 'pending', created_at: new Date().toISOString() },
-            { id: '4', customer_name: 'Ana Lima', customer_email: 'ana@email.com', customer_whatsapp: '11977777777', product_name: 'Disney+ Premium', total: 14.90, status: 'paid', created_at: new Date().toISOString() },
-            { id: '5', customer_name: 'Carlos Rocha', customer_email: 'carlos@email.com', customer_whatsapp: '', product_name: 'HBO Max', total: 14.90, status: 'cancelled', created_at: new Date(Date.now() - 86400000).toISOString() },
-        ]);
+        setOrders([]);
     }
 
     const filteredOrders = filter === 'all' ? orders : orders.filter(o => o.status === filter);
 
     const updateStatus = async (orderId: string, newStatus: string) => {
         try {
-            await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-        } catch {
-            // Demo
-        }
+            await fetch('/api/admin/orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: orderId, status: newStatus }),
+            });
+        } catch { /* ignore */ }
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
     };
 

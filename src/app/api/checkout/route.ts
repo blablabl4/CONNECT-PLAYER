@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,6 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { product_id, variation_id, variation_name, customer_name, customer_email, customer_whatsapp } = body;
 
-        // Validate required fields
         if (!product_id || !customer_name || !customer_email) {
             return NextResponse.json(
                 { error: 'Campos obrigatórios: product_id, customer_name, customer_email' },
@@ -17,38 +16,30 @@ export async function POST(request: NextRequest) {
         }
 
         // Fetch product
-        const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', product_id)
-            .eq('is_active', true)
-            .single();
+        const product = await prisma.product.findFirst({
+            where: { id: product_id, is_active: true },
+        });
 
-        if (productError || !product) {
+        if (!product) {
             return NextResponse.json({ error: 'Produto não encontrado ou indisponível' }, { status: 404 });
         }
 
         // Check stock (available credentials)
-        let stockQuery = supabase
-            .from('credentials')
-            .select('*', { count: 'exact', head: true })
-            .eq('product_id', product_id)
-            .eq('is_used', false);
+        const stockCount = await prisma.credential.count({
+            where: {
+                product_id,
+                is_used: false,
+                ...(variation_id ? { variation_id } : {}),
+            },
+        });
 
-        if (variation_id) {
-            stockQuery = stockQuery.eq('variation_id', variation_id);
-        }
-
-        const { count } = await stockQuery;
-
-        if (!count || count === 0) {
+        if (stockCount === 0) {
             return NextResponse.json({ error: 'Produto/Variação sem estoque disponível' }, { status: 400 });
         }
 
         // Create order
-        const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .insert({
+        const order = await prisma.order.create({
+            data: {
                 product_id,
                 variation_id: variation_id || null,
                 variation_name: variation_name || null,
@@ -57,21 +48,15 @@ export async function POST(request: NextRequest) {
                 customer_whatsapp: customer_whatsapp || '',
                 status: 'pending',
                 payment_method: 'pix',
-                total: product.price, // Note: In a real app we should verify price against variation price in DB
-            })
-            .select()
-            .single();
-
-        if (orderError) throw orderError;
-
-        // TODO: Generate Pix QR Code via Mercado Pago API
-        // For now, return order ID for the status page
+                total: Number(product.price),
+            },
+        });
 
         return NextResponse.json({
             order_id: order.id,
-            total: product.price,
-            pix_qr_code: '', // TODO: actual QR code
-            pix_code: '', // TODO: actual Pix copy-paste code
+            total: Number(product.price),
+            pix_qr_code: '',
+            pix_code: '',
         });
     } catch (error) {
         console.error('Checkout error:', error);

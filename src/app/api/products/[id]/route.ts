@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,14 +9,24 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const { data, error } = await supabase
-            .from('products')
-            .select('*')
-            .eq('id', id)
-            .single();
+        const product = await prisma.product.findUnique({
+            where: { id },
+            include: { variations: true },
+        });
 
-        if (error) throw error;
-        return NextResponse.json(data);
+        if (!product) {
+            return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
+        }
+
+        return NextResponse.json({
+            ...product,
+            price: Number(product.price),
+            variations: product.variations.map(v => ({
+                ...v,
+                price: Number(v.price),
+                original_price: v.original_price ? Number(v.original_price) : null,
+            })),
+        });
     } catch {
         return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
     }

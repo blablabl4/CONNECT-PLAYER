@@ -23,16 +23,28 @@ export default function AdminSettingsPage() {
             router.push('/admin/login');
             return;
         }
-        // Load settings from localStorage or Supabase
-        const savedSettings = localStorage.getItem('cp_settings');
-        if (savedSettings) {
-            setSettings(JSON.parse(savedSettings));
+        // Load settings from API
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/admin/settings');
+                if (res.ok) {
+                    const data = await res.json();
+                    setSettings(prev => ({ ...prev, ...data }));
+                }
+            } catch { /* ignore */ }
         }
+        loadSettings();
     }, [router]);
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        localStorage.setItem('cp_settings', JSON.stringify(settings));
+        try {
+            await fetch('/api/admin/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings),
+            });
+        } catch { /* ignore */ }
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };

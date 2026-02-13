@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { supabase, Credential, Product } from '@/lib/supabase';
+import { Credential, Product } from '@/lib/types';
 
 // Helper type for view
 type CredentialWithProduct = Credential & {
@@ -34,41 +34,26 @@ export default function AdminCredentialsPage() {
 
     async function fetchData() {
         try {
-            // Fetch products AND variations to populate dropdowns
-            const { data: prods } = await supabase
-                .from('products')
-                .select('*, variations:product_variations(*)')
-                .order('name');
+            const [prodsRes, credsRes] = await Promise.all([
+                fetch('/api/admin/products'),
+                fetch('/api/admin/credentials'),
+            ]);
 
-            if (prods) setProducts(prods);
+            if (prodsRes.ok) setProducts(await prodsRes.json());
 
-            // Fetch credentials with product and variation names
-            const { data: creds } = await supabase
-                .from('credentials')
-                .select('*, product:products(name), variation:product_variations(name)')
-                .order('created_at', { ascending: false });
-
-            if (creds) {
-                setCredentials(creds.map(c => ({
+            if (credsRes.ok) {
+                const creds = await credsRes.json();
+                setCredentials(creds.map((c: any) => ({
                     ...c,
-                    product_name: (c.product as any)?.name + ((c.variation as any)?.name ? ` (${(c.variation as any).name})` : ''),
+                    product_name: (c.product?.name || 'N/A') + (c.variation?.name ? ` (${c.variation.name})` : ''),
                 })));
                 return;
             }
         } catch {
-            // Demo
+            // fallback
         }
-        // Fallback demo
-        setProducts([
-            {
-                id: '1', name: 'Netflix Premium', description: '', price: 19.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 50, features: [], created_at: '', updated_at: '', variations: [
-                    { id: 'v1', product_id: '1', name: '1 Tela', description: '', price: 19.90, stock: 20, duration: '30 dias', created_at: '' }
-                ]
-            },
-        ]);
-        setCredentials([
-            { id: '1', product_id: '1', variation_id: 'v1', email: 'user1@netflix.com', password: '****', is_used: false, assigned_to: '', created_at: new Date().toISOString(), product_name: 'Netflix Premium (1 Tela)' },
-        ]);
+        setProducts([]);
+        setCredentials([]);
     }
 
     const filteredCreds = filter === 'all' ? credentials
@@ -82,13 +67,17 @@ export default function AdminCredentialsPage() {
     const handleAddSingle = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await supabase.from('credentials').insert({
-                product_id: newCred.product_id,
-                variation_id: newCred.variation_id || null,
-                email: newCred.email,
-                password: newCred.password
+            await fetch('/api/admin/credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    product_id: newCred.product_id,
+                    variation_id: newCred.variation_id || null,
+                    email: newCred.email,
+                    password: newCred.password,
+                }),
             });
-        } catch { /* demo */ }
+        } catch { /* ignore */ }
         setShowModal(false);
         setNewCred({ product_id: '', variation_id: '', email: '', password: '' });
         fetchData();
@@ -108,7 +97,13 @@ export default function AdminCredentialsPage() {
         }).filter(c => c.email && c.password);
 
         try {
-            await supabase.from('credentials').insert(creds);
+            for (const c of creds) {
+                await fetch('/api/admin/credentials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(c),
+                });
+            }
         } catch { /* demo */ }
         setShowBulkModal(false);
         setBulkText('');
@@ -119,7 +114,7 @@ export default function AdminCredentialsPage() {
 
     const deleteCred = async (id: string) => {
         if (!confirm('Excluir esta credencial?')) return;
-        try { await supabase.from('credentials').delete().eq('id', id); } catch { /* demo */ }
+        try { await fetch(`/api/admin/credentials?id=${id}`, { method: 'DELETE' }); } catch { /* ignore */ }
         fetchData();
     };
 

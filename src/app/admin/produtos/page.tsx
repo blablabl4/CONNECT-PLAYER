@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { supabase, Product, ProductVariation } from '@/lib/supabase';
+import { Product, ProductVariation } from '@/lib/types';
 
 const EMPTY_PRODUCT: Partial<Product> = {
     name: '', description: '', price: 0, image_url: '',
@@ -32,36 +32,16 @@ export default function AdminProductsPage() {
 
     async function fetchProducts() {
         try {
-            // Fetch products AND their variations
-            const { data, error } = await supabase
-                .from('products')
-                .select('*, product_variations(*)')
-                .order('created_at', { ascending: false });
-
-            if (data && !error) {
-                // Map the response to our type structure
-                const typedData = data.map((p: any) => ({
-                    ...p,
-                    variations: p.product_variations || []
-                }));
-                setProducts(typedData);
+            const res = await fetch('/api/admin/products');
+            if (res.ok) {
+                const data = await res.json();
+                setProducts(data);
                 return;
             }
         } catch {
-            // Demo data fallback
+            // fallback
         }
-        // Fallback demo data
-        setProducts([
-            {
-                id: '1', name: 'Netflix Premium', description: 'Ultra HD 4K', price: 19.90, image_url: '',
-                category: 'Streaming', duration: '30 dias', is_active: true, stock: 50, features: [],
-                created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
-                variations: [
-                    { id: 'v1', product_id: '1', name: '1 Tela', description: '', price: 19.90, stock: 20, duration: '30 dias' },
-                    { id: 'v2', product_id: '1', name: '4 Telas', description: '', price: 35.90, stock: 30, duration: '30 dias' }
-                ]
-            }
-        ]);
+        setProducts([]);
     }
 
     const openNewProduct = () => {
@@ -131,48 +111,19 @@ export default function AdminProductsPage() {
         };
 
         try {
-            let productId = editingProduct?.id;
+            const payload = {
+                ...productData,
+                ...(editingProduct ? { id: editingProduct.id } : {}),
+                ...(hasVariations ? { variations } : { variations: [] }),
+            };
 
-            if (editingProduct) {
-                await supabase.from('products').update(productData).eq('id', editingProduct.id);
-            } else {
-                const { data, error } = await supabase.from('products').insert(productData).select().single();
-                if (data) productId = data.id;
-            }
+            const res = await fetch('/api/admin/products', {
+                method: editingProduct ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
 
-            // Handle variations
-            if (productId && hasVariations) {
-                // Delete removed variations implies we need to handle ID tracking, 
-                // for simplicity here we might delete all and recreate or just upset.
-                // Better approach: upsert.
-
-                // For this MVP, if we are editing, let's just insert new ones and update existing.
-                // To keep it simple and robust for mvp:
-                // 1. Get existing IDs for this product
-                // 2. Delete those not in current list? Or just upsert everything.
-
-                // Let's iterate and upsert
-                for (const v of variations) {
-                    const varData = {
-                        product_id: productId,
-                        name: v.name,
-                        price: v.price,
-                        stock: v.stock,
-                        duration: v.duration,
-                        description: v.description || ''
-                    };
-
-                    if (v.id) {
-                        await supabase.from('product_variations').update(varData).eq('id', v.id);
-                    } else {
-                        await supabase.from('product_variations').insert(varData);
-                    }
-                }
-            } else if (productId && !hasVariations && editingProduct) {
-                // Determine if we should delete existing variations? 
-                // Maybe warn user. For now, leave as is.
-            }
-
+            if (!res.ok) throw new Error('Save failed');
         } catch (err) {
             console.error(err);
         }
@@ -185,8 +136,8 @@ export default function AdminProductsPage() {
     const deleteProduct = async (id: string) => {
         if (!confirm('Tem certeza que deseja excluir este produto?')) return;
         try {
-            await supabase.from('products').delete().eq('id', id);
-        } catch { /* Demo */ }
+            await fetch(`/api/admin/products?id=${id}`, { method: 'DELETE' });
+        } catch { /* ignore */ }
         fetchProducts();
     };
 
@@ -361,7 +312,7 @@ export default function AdminProductsPage() {
                                                     </div>
                                                     <div>
                                                         <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
-                                                        <select className="form-input" value={v.duration} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
+                                                        <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
                                                             <option value="30 dias">30 dias</option>
                                                             <option value="60 dias">60 dias</option>
                                                             <option value="90 dias">90 dias</option>

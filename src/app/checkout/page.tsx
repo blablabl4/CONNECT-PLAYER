@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { supabase, Product } from '@/lib/supabase';
+import { Product } from '@/lib/types';
 
 const DEMO_PRODUCTS: Record<string, Product> = {
     '1': { id: '1', name: 'Netflix Premium', description: '', price: 19.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 50, features: [], created_at: '', updated_at: '' },
@@ -36,13 +36,9 @@ function CheckoutContent() {
     useEffect(() => {
         async function fetchProduct() {
             try {
-                const { data, error } = await supabase
-                    .from('products')
-                    .select('*, variations:product_variations(*)')
-                    .eq('id', productId)
-                    .single();
-
-                if (data && !error) {
+                const res = await fetch(`/api/products/${productId}`);
+                if (res.ok) {
+                    const data = await res.json();
                     setProduct(data);
                     setLoading(false);
                     return;

@@ -5,7 +5,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
 import ParticleBackground from '@/components/ParticleBackground';
-import { supabase, Product } from '@/lib/supabase';
+import { Product } from '@/lib/types';
 
 // Demo products
 const DEMO_PRODUCTS: Product[] = [
@@ -79,17 +79,15 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false });
-
-        if (data && data.length > 0 && !error) {
-          setProducts(data);
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.length > 0) {
+            setProducts(data);
+          }
         }
       } catch {
-        // Use demo products if Supabase is not configured
+        // Use demo products if API is not available
       }
     }
     fetchProducts();

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ParticleBackground from '@/components/ParticleBackground';
-import { supabase, Product, ProductVariation } from '@/lib/supabase';
+import { Product, ProductVariation } from '@/lib/types';
 
 // Demo products with variations
 const DEMO_PRODUCTS: Record<string, Product> = {
@@ -93,12 +93,9 @@ export default function ProductDetailPage() {
         async function fetchProduct() {
             const id = params.id as string;
             try {
-                const { data, error } = await supabase
-                    .from('products')
-                    .select('*, variations:product_variations(*)')
-                    .eq('id', id)
-                    .single();
-                if (data && !error) {
+                const res = await fetch(`/api/products/${id}`);
+                if (res.ok) {
+                    const data = await res.json();
                     setProduct(data);
                     if (data.variations?.length > 0) setSelectedVariation(data.variations[0]);
                     setLoading(false);

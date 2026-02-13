@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { supabase } from '@/lib/supabase';
 
 interface Stats {
     totalOrders: number;
@@ -41,57 +40,19 @@ export default function AdminDashboard() {
 
         async function fetchData() {
             try {
-                // Fetch stats
-                const { count: totalOrders } = await supabase.from('orders').select('*', { count: 'exact', head: true });
-                const { count: pendingOrders } = await supabase.from('orders').select('*', { count: 'exact', head: true }).eq('status', 'pending');
-                const { count: totalProducts } = await supabase.from('products').select('*', { count: 'exact', head: true });
-
-                const { data: orders } = await supabase.from('orders').select('total').eq('status', 'paid');
-                const totalRevenue = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
-
-                // Recent orders with product name
-                const { data: recent } = await supabase
-                    .from('orders')
-                    .select('*, product:products(name)')
-                    .order('created_at', { ascending: false })
-                    .limit(10);
-
-                setStats({
-                    totalOrders: totalOrders || 0,
-                    totalRevenue,
-                    pendingOrders: pendingOrders || 0,
-                    totalProducts: totalProducts || 0,
-                    todayOrders: 0,
-                    todayRevenue: 0,
-                });
-
-                if (recent) {
-                    setRecentOrders(recent.map(o => ({
-                        ...o,
-                        product_name: (o.product as unknown as { name: string })?.name || 'N/A',
-                    })));
+                const res = await fetch('/api/admin/stats');
+                if (res.ok) {
+                    const data = await res.json();
+                    setStats(data.stats);
+                    setRecentOrders(data.recentOrders);
                 }
             } catch {
-                // Demo mode - show placeholder data
-                setStats({
-                    totalOrders: 127,
-                    totalRevenue: 2847.30,
-                    pendingOrders: 3,
-                    totalProducts: 12,
-                    todayOrders: 8,
-                    todayRevenue: 189.20,
-                });
-                setRecentOrders([
-                    { id: '1', customer_name: 'João Silva', customer_email: 'joao@email.com', product_name: 'Netflix Premium', total: 19.90, status: 'paid', created_at: new Date().toISOString() },
-                    { id: '2', customer_name: 'Maria Santos', customer_email: 'maria@email.com', product_name: 'Spotify Premium', total: 9.90, status: 'paid', created_at: new Date().toISOString() },
-                    { id: '3', customer_name: 'Pedro Costa', customer_email: 'pedro@email.com', product_name: 'IPTV Full HD', total: 29.90, status: 'pending', created_at: new Date().toISOString() },
-                    { id: '4', customer_name: 'Ana Lima', customer_email: 'ana@email.com', product_name: 'Disney+ Premium', total: 14.90, status: 'delivered', created_at: new Date().toISOString() },
-                    { id: '5', customer_name: 'Carlos Rocha', customer_email: 'carlos@email.com', product_name: 'HBO Max', total: 14.90, status: 'paid', created_at: new Date().toISOString() },
-                ]);
+                // Demo mode
             }
         }
         fetchData();
     }, [router]);
+
 
     const getStatusBadge = (status: string) => {
         switch (status) {

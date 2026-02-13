@@ -1,107 +1,87 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 import { resend } from '@/lib/resend';
 
 export const dynamic = 'force-dynamic';
 
-// Webhook for payment gateway (Mercado Pago, etc.)
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
+        const { payment_id, status } = body;
 
-        // Mercado Pago sends a notification with the payment ID
-        // This is a simplified handler – adjust to your payment provider's format
-        const paymentId = body.data?.id || body.payment_id;
-        const status = body.action === 'payment.updated' ? 'paid' : null;
-
-        if (!paymentId || !status) {
-            return NextResponse.json({ received: true });
+        if (!payment_id) {
+            return NextResponse.json({ error: 'payment_id obrigatório' }, { status: 400 });
         }
 
         // Find order by payment_id
-        const { data: order, error: orderError } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('payment_id', paymentId)
-            .single();
+        const order = await prisma.order.findFirst({
+            where: { payment_id },
+            include: { product: true },
+        });
 
-        if (orderError || !order) {
-            console.error('Order not found for payment:', paymentId);
-            return NextResponse.json({ received: true });
+        if (!order) {
+            return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
         }
 
-        // Skip if already processed
-        if (order.status !== 'pending') {
-            return NextResponse.json({ received: true });
-        }
-
-        // Find available credential for this product
-        // Find available credential for this product
-        let credQuery = supabase
-            .from('credentials')
-            .select('*')
-            .eq('product_id', order.product_id)
-            .eq('is_used', false)
-            .limit(1);
-
-        if (order.variation_id) {
-            credQuery = credQuery.eq('variation_id', order.variation_id);
-        }
-
-        const { data: credential, error: credError } = await credQuery.single();
-
-        if (credError || !credential) {
-            console.error('No available credentials for product:', order.product_id);
-            // Still mark as paid, admin will need to handle manually
-            await supabase
-                .from('orders')
-                .update({ status: 'paid' })
-                .eq('id', order.id);
-
-            return NextResponse.json({ received: true, warning: 'No credentials available' });
-        }
-
-        // Assign credential to order
-        await supabase
-            .from('credentials')
-            .update({ is_used: true, assigned_to: order.id })
-            .eq('id', credential.id);
-
-        // Update order status
-        await supabase
-            .from('orders')
-            .update({ status: 'delivered', credential_id: credential.id })
-            .eq('id', order.id);
-
-        // Send email with credentials
-        try {
-            await resend.emails.send({
-                from: 'Connect Player <onboarding@resend.dev>', // Default Resend test domain
-                to: [order.customer_email],
-                subject: `Seu acesso chegou! - Connect Player`,
-                html: `
-                    <div style="font-family: sans-serif; color: #333;">
-                        <h1>Olá, ${order.customer_name}!</h1>
-                        <p>Obrigado pela sua compra. O pagamento foi confirmado e aqui estão os seus dados de acesso:</p>
-                        <div style="background: #f4f4f5; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e4e4e7;">
-                            <p style="margin: 5px 0;"><strong>Produto:</strong> ${credential.email}</p>
-                            <p style="margin: 5px 0;"><strong>Senha:</strong> ${credential.password}</p>
-                            ${order.variation_name ? `<p style="margin: 5px 0; color: #666; font-size: 0.9em;">Variação: ${order.variation_name}</p>` : ''}
-                        </div>
-                        <p>Se tiver dúvidas, entre em contato com nosso suporte.</p>
-                        <p>Atenciosamente,<br>Equipe Connect Player</p>
-                    </div>
-                `
+        if (status === 'approved' || status === 'paid') {
+            // Find an available credential
+            const credential = await prisma.credential.findFirst({
+                where: {
+                    product_id: order.product_id,
+                    is_used: false,
+                    ...(order.variation_id ? { variation_id: order.variation_id } : {}),
+                },
             });
-        } catch (emailError) {
-            console.error('Failed to send email:', emailError);
+
+            if (credential) {
+                // Mark credential as used and assign to order
+                await prisma.$transaction([
+                    prisma.credential.update({
+                        where: { id: credential.id },
+                        data: { is_used: true, assigned_to: order.id },
+                    }),
+                    prisma.order.update({
+                        where: { id: order.id },
+                        data: { status: 'delivered', credential_id: credential.id },
+                    }),
+                ]);
+
+                // Send email with credentials
+                try {
+                    await resend.emails.send({
+                        from: process.env.EMAIL_FROM || 'Connect Player <noreply@connectplayer.com>',
+                        to: order.customer_email,
+                        subject: `Seus dados de acesso - ${order.product?.name || 'Produto'}`,
+                        html: `
+                            <h2>Obrigado pela compra, ${order.customer_name}!</h2>
+                            <p>Aqui estão seus dados de acesso:</p>
+                            <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0;">
+                                <p><strong>Email:</strong> ${credential.email}</p>
+                                <p><strong>Senha:</strong> ${credential.password}</p>
+                            </div>
+                            <p>Qualquer dúvida, entre em contato!</p>
+                        `,
+                    });
+                } catch (emailError) {
+                    console.error('Email send error:', emailError);
+                }
+            } else {
+                // No credential available, just mark as paid
+                await prisma.order.update({
+                    where: { id: order.id },
+                    data: { status: 'paid' },
+                });
+            }
+        } else if (status === 'cancelled' || status === 'rejected') {
+            await prisma.order.update({
+                where: { id: order.id },
+                data: { status: 'cancelled' },
+            });
         }
 
-        console.log(`Order ${order.id} completed. Credential ${credential.id} assigned. Email sent.`);
-
-        return NextResponse.json({ received: true, status: 'delivered' });
+        return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Webhook error:', error);
-        return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+        return NextResponse.json({ error: 'Erro no webhook' }, { status: 500 });
     }
 }

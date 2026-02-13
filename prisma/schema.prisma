@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  description    String             @default("")
+  price          Decimal            @db.Decimal(10, 2)
+  image_url      String             @default("")
+  category       String             @default("")
+  duration       String             @default("30 dias")
+  is_active      Boolean            @default(true)
+  stock          Int                @default(0)
+  features       String[]           @default([])
+  created_at     DateTime           @default(now()) @db.Timestamptz
+  updated_at     DateTime           @default(now()) @updatedAt @db.Timestamptz
+
+  variations     ProductVariation[]
+  credentials    Credential[]
+  orders         Order[]
+
+  @@index([is_active])
+  @@index([category])
+  @@map("products")
+}
+
+model ProductVariation {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id     String       @db.Uuid
+  name           String
+  description    String?
+  price          Decimal      @db.Decimal(10, 2)
+  original_price Decimal?     @db.Decimal(10, 2)
+  duration       String?
+  stock          Int          @default(0)
+  created_at     DateTime     @default(now()) @db.Timestamptz
+  updated_at     DateTime     @default(now()) @updatedAt @db.Timestamptz
+
+  product        Product      @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  credentials    Credential[]
+  orders         Order[]
+
+  @@map("product_variations")
+}
+
+model Credential {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id     String            @db.Uuid
+  variation_id   String?           @db.Uuid
+  email          String
+  password       String
+  is_used        Boolean           @default(false)
+  assigned_to    String?           @db.Uuid
+  created_at     DateTime          @default(now()) @db.Timestamptz
+
+  product        Product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  variation      ProductVariation? @relation(fields: [variation_id], references: [id], onDelete: SetNull)
+  orders         Order[]
+
+  @@index([product_id])
+  @@index([product_id, is_used])
+  @@map("credentials")
+}
+
+model Order {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id        String            @db.Uuid
+  variation_id      String?           @db.Uuid
+  variation_name    String?
+  customer_name     String
+  customer_email    String
+  customer_whatsapp String            @default("")
+  status            String            @default("pending")
+  payment_id        String            @default("")
+  payment_method    String            @default("pix")
+  total             Decimal           @db.Decimal(10, 2)
+  credential_id     String?           @db.Uuid
+  created_at        DateTime          @default(now()) @db.Timestamptz
+  updated_at        DateTime          @default(now()) @updatedAt @db.Timestamptz
+
+  product           Product           @relation(fields: [product_id], references: [id])
+  variation         ProductVariation? @relation(fields: [variation_id], references: [id], onDelete: SetNull)
+  credential        Credential?       @relation(fields: [credential_id], references: [id])
+
+  @@index([status])
+  @@index([payment_id])
+  @@index([created_at(sort: Desc)])
+  @@map("orders")
+}
+
+model Setting {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key        String   @unique
+  value      String   @default("")
+  updated_at DateTime @default(now()) @updatedAt @db.Timestamptz
+
+  @@map("settings")
+}

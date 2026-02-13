@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,14 +9,19 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const { data: order, error } = await supabase
-            .from('orders')
-            .select('id, status, created_at, total')
-            .eq('id', id)
-            .single();
+        const order = await prisma.order.findUnique({
+            where: { id },
+            select: { id: true, status: true, created_at: true, total: true },
+        });
 
-        if (error) throw error;
-        return NextResponse.json(order);
+        if (!order) {
+            return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
+        }
+
+        return NextResponse.json({
+            ...order,
+            total: Number(order.total),
+        });
     } catch {
         return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
     }
