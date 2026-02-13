@@ -13,6 +13,8 @@ export interface ProductVariation {
     description: string;
     price: number;
     original_price?: number;
+    discount?: number;
+    badge?: string;
     duration: string;
     stock: number;
     created_at?: string;

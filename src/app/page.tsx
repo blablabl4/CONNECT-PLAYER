@@ -183,8 +183,9 @@ export default function HomePage() {
 
           <div className="hp-products-row">
             {filteredProducts.map((product, i) => {
-              const discount = product.original_price > 0
-                ? Math.round((1 - product.price / product.original_price) * 100)
+              const originalPrice = product.original_price || 0;
+              const discount = originalPrice > 0
+                ? Math.round((1 - product.price / originalPrice) * 100)
                 : 0;
               return (
                 <div key={product.id} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.08}s`, opacity: 0 }}>
