@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import AdminSidebar from '@/components/AdminSidebar';
 
 interface AffiliateData {
     id: string;
@@ -14,6 +16,7 @@ interface AffiliateData {
 }
 
 export default function AdminAfiliadosPage() {
+    const router = useRouter();
     const [affiliates, setAffiliates] = useState<AffiliateData[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -31,7 +34,13 @@ export default function AdminAfiliadosPage() {
         }
     };
 
-    useEffect(() => { fetchAffiliates(); }, []);
+    useEffect(() => {
+        if (typeof window !== 'undefined' && !localStorage.getItem('admin_auth')) {
+            router.push('/admin/login');
+            return;
+        }
+        fetchAffiliates();
+    }, [router]);
 
     const totalVisits = affiliates.reduce((sum, a) => sum + a.total_visits, 0);
 
@@ -44,8 +53,9 @@ export default function AdminAfiliadosPage() {
     };
 
     return (
-        <div className="admin-content">
-            <div className="admin-content-inner">
+        <div className="admin-layout">
+            <AdminSidebar />
+            <main className="admin-content">
                 <div className="admin-header">
                     <h1 className="admin-title">
                         🤝 <span className="gold-text">Afiliados</span>
@@ -165,7 +175,7 @@ export default function AdminAfiliadosPage() {
                         </div>
                     )}
                 </div>
-            </div>
+            </main>
         </div>
     );
 }
