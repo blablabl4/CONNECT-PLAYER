@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { resend } from '@/lib/resend';
+import { credentialDeliveryEmail, orderConfirmationEmail } from '@/lib/email-templates';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,19 +49,31 @@ export async function POST(request: NextRequest) {
 
                 // Send email with credentials
                 try {
+                    // Send credential email
                     await resend.emails.send({
-                        from: process.env.EMAIL_FROM || 'Connect Player <noreply@connectplayer.com>',
+                        from: process.env.EMAIL_FROM || 'Connect Player <noreply@connectplayer.com.br>',
                         to: order.customer_email,
                         subject: `Seus dados de acesso - ${order.product?.name || 'Produto'}`,
-                        html: `
-                            <h2>Obrigado pela compra, ${order.customer_name}!</h2>
-                            <p>Aqui estão seus dados de acesso:</p>
-                            <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0;">
-                                <p><strong>Email:</strong> ${credential.email}</p>
-                                <p><strong>Senha:</strong> ${credential.password}</p>
-                            </div>
-                            <p>Qualquer dúvida, entre em contato!</p>
-                        `,
+                        html: credentialDeliveryEmail({
+                            customerName: order.customer_name,
+                            productName: order.product?.name || 'Produto',
+                            credentialEmail: credential.email,
+                            credentialPassword: credential.password,
+                            variationName: order.variation_name || undefined,
+                        }),
+                    });
+
+                    // Send order confirmation email
+                    await resend.emails.send({
+                        from: process.env.EMAIL_FROM || 'Connect Player <noreply@connectplayer.com.br>',
+                        to: order.customer_email,
+                        subject: `Pedido confirmado - Connect Player`,
+                        html: orderConfirmationEmail({
+                            customerName: order.customer_name,
+                            productName: order.product?.name || 'Produto',
+                            total: Number(order.total).toFixed(2),
+                            orderId: order.id,
+                        }),
                     });
                 } catch (emailError) {
                     console.error('Email send error:', emailError);
