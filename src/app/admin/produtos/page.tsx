@@ -326,35 +326,44 @@ export default function AdminProductsPage() {
                                         </label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
                                             {variations.map((v, idx) => (
-                                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 42px', gap: '12px', alignItems: 'end', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                                                    <div style={{ gridColumn: '1 / -1' }}>
-                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome da Variação (Ex: 1 Tela, Mensal)</label>
+                                                <div key={idx} style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    {/* Header: title + delete */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Variação {idx + 1}</span>
+                                                        <button type="button" onClick={() => removeVariation(idx)} className="btn" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.9rem' }} title="Remover opção">
+                                                            🗑️
+                                                        </button>
+                                                    </div>
+                                                    {/* Name */}
+                                                    <div>
+                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome (Ex: 1 Tela, Mensal)</label>
                                                         <input type="text" className="form-input" placeholder="Nome da opção" value={v.name} onChange={e => handleVariationChange(idx, 'name', e.target.value)} required />
                                                     </div>
-                                                    <div style={{ gridColumn: '1 / -1' }}>
-                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Descrição da Variação</label>
-                                                        <textarea className="form-input" rows={2} placeholder="Descrição específica desta variação..." value={v.description || ''} onChange={e => handleVariationChange(idx, 'description', e.target.value)} style={{ resize: 'vertical', minHeight: '50px', fontSize: '0.85rem' }} />
-                                                    </div>
+                                                    {/* Description */}
                                                     <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$)</label>
-                                                        <input type="number" step="0.01" className="form-input" placeholder="0.00" value={v.price} onChange={e => handleVariationChange(idx, 'price', parseFloat(e.target.value))} required />
+                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Descrição</label>
+                                                        <textarea className="form-input" rows={2} placeholder="Descrição específica desta variação..." value={v.description || ''} onChange={e => handleVariationChange(idx, 'description', e.target.value)} style={{ resize: 'vertical', minHeight: '50px', fontSize: '0.85rem', width: '100%' }} />
                                                     </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Estoque</label>
-                                                        <input type="number" className="form-input" placeholder="0" value={v.stock} onChange={e => handleVariationChange(idx, 'stock', parseInt(e.target.value))} />
+                                                    {/* Price / Stock / Duration row */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$)</label>
+                                                            <input type="number" step="0.01" className="form-input" placeholder="0.00" value={v.price} onChange={e => handleVariationChange(idx, 'price', parseFloat(e.target.value))} required />
+                                                        </div>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Estoque</label>
+                                                            <input type="number" className="form-input" placeholder="0" value={v.stock} onChange={e => handleVariationChange(idx, 'stock', parseInt(e.target.value))} />
+                                                        </div>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
+                                                            <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
+                                                                <option value="30 dias">30 dias</option>
+                                                                <option value="60 dias">60 dias</option>
+                                                                <option value="90 dias">90 dias</option>
+                                                                <option value="Vitalício">Vitalício</option>
+                                                            </select>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
-                                                        <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
-                                                            <option value="30 dias">30 dias</option>
-                                                            <option value="60 dias">60 dias</option>
-                                                            <option value="90 dias">90 dias</option>
-                                                            <option value="Vitalício">Vitalício</option>
-                                                        </select>
-                                                    </div>
-                                                    <button type="button" onClick={() => removeVariation(idx)} className="btn" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', height: '42px', width: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center' }} title="Remover opção">
-                                                        🗑️
-                                                    </button>
                                                 </div>
                                             ))}
                                             {variations.length === 0 && (
