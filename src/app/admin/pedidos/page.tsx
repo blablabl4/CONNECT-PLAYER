@@ -20,6 +20,7 @@ export default function AdminOrdersPage() {
     const router = useRouter();
     const [orders, setOrders] = useState<Order[]>([]);
     const [filter, setFilter] = useState('all');
+    const [resending, setResending] = useState<string | null>(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('admin_auth')) {
@@ -54,6 +55,23 @@ export default function AdminOrdersPage() {
             });
         } catch { /* ignore */ }
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+    };
+
+    const resendEmail = async (orderId: string) => {
+        setResending(orderId);
+        try {
+            const res = await fetch(`/api/orders/${orderId}/resend`, { method: 'POST' });
+            const data = await res.json();
+            if (res.ok) {
+                alert('✅ E-mail reenviado com sucesso!');
+            } else {
+                alert(`❌ Erro: ${data.error || 'Falha ao reenviar'}`);
+            }
+        } catch {
+            alert('❌ Erro de conexão ao reenviar e-mail');
+        } finally {
+            setResending(null);
+        }
     };
 
     const getStatusBadge = (status: string) => {
@@ -155,8 +173,13 @@ export default function AdminOrdersPage() {
                                                 </>
                                             )}
                                             {(order.status === 'paid' || order.status === 'delivered') && (
-                                                <button className="btn btn-sm btn-secondary" title="Reenviar credenciais">
-                                                    📧 Reenviar
+                                                <button
+                                                    className="btn btn-sm btn-secondary"
+                                                    title="Reenviar credenciais"
+                                                    onClick={() => resendEmail(order.id)}
+                                                    disabled={resending === order.id}
+                                                >
+                                                    {resending === order.id ? '⏳ Enviando...' : '📧 Reenviar'}
                                                 </button>
                                             )}
                                         </div>
