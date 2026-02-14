@@ -1,4 +1,4 @@
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { MercadoPagoConfig, Preference, Payment } from 'mercadopago';
 
 // Lazy initialization — don't throw during build time
 const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN || '';
@@ -8,3 +8,4 @@ export const mpClient = new MercadoPagoConfig({
 });
 
 export const mpPreference = new Preference(mpClient);
+export const mpPayment = new Payment(mpClient);

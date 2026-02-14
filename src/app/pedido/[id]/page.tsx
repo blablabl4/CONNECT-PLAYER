@@ -5,19 +5,28 @@ import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
+interface PixData {
+    qr_code_base64: string;
+    qr_code: string;
+    total: number;
+}
+
 export default function OrderStatusPage() {
     const params = useParams();
     const router = useRouter();
     const orderId = params.id as string;
-    const isDemo = orderId.startsWith('demo-');
 
     const [status, setStatus] = useState<'pending' | 'paid' | 'delivered'>('pending');
+    const [pixData, setPixData] = useState<PixData | null>(null);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
-        if (isDemo) {
-            // Simulate payment confirmation after 5 seconds
-            const timer = setTimeout(() => setStatus('paid'), 5000);
-            return () => clearTimeout(timer);
+        // Load Pix data from sessionStorage
+        const stored = sessionStorage.getItem(`pix_${orderId}`);
+        if (stored) {
+            try {
+                setPixData(JSON.parse(stored));
+            } catch { /* ignore */ }
         }
 
         // Poll for payment status
@@ -29,6 +38,8 @@ export default function OrderStatusPage() {
                     if (data.status === 'paid' || data.status === 'delivered') {
                         setStatus(data.status);
                         clearInterval(interval);
+                        // Clean up sessionStorage
+                        sessionStorage.removeItem(`pix_${orderId}`);
                     }
                 }
             } catch {
@@ -37,7 +48,15 @@ export default function OrderStatusPage() {
         }, 3000);
 
         return () => clearInterval(interval);
-    }, [orderId, isDemo]);
+    }, [orderId]);
+
+    const handleCopy = () => {
+        if (pixData?.qr_code) {
+            navigator.clipboard.writeText(pixData.qr_code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 3000);
+        }
+    };
 
     return (
         <>
@@ -53,6 +72,18 @@ export default function OrderStatusPage() {
                                 Após a confirmação, as credenciais serão enviadas automaticamente para o seu e-mail.
                             </p>
 
+                            {pixData?.total && (
+                                <div style={{
+                                    fontSize: '1.5rem',
+                                    fontWeight: 800,
+                                    color: 'var(--accent-gold)',
+                                    marginBottom: '20px',
+                                    fontFamily: 'var(--font-heading)',
+                                }}>
+                                    R$ {pixData.total.toFixed(2)}
+                                </div>
+                            )}
+
                             <div style={{
                                 padding: '24px',
                                 background: 'var(--bg-secondary)',
@@ -62,29 +93,52 @@ export default function OrderStatusPage() {
                                 <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
                                     Escaneie o QR Code ou copie o código Pix
                                 </div>
-                                <div style={{
-                                    width: '180px', height: '180px',
-                                    background: '#fff', borderRadius: 'var(--radius-md)',
-                                    margin: '0 auto 16px',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    color: '#666', fontSize: '0.75rem', textAlign: 'center', padding: '16px',
-                                }}>
-                                    QR Code Pix<br />(será gerado via API)
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', maxWidth: '360px', margin: '0 auto' }}>
-                                    <input
-                                        className="form-input"
-                                        value="pix-code-placeholder"
-                                        readOnly
-                                        style={{ flex: 1, fontSize: '0.8rem', textAlign: 'center' }}
-                                    />
-                                    <button
-                                        className="btn btn-outline-gold btn-sm"
-                                        onClick={() => navigator.clipboard.writeText('pix-code-placeholder')}
-                                    >
-                                        Copiar
-                                    </button>
-                                </div>
+
+                                {/* QR Code Image */}
+                                {pixData?.qr_code_base64 ? (
+                                    <div style={{
+                                        width: '200px', height: '200px',
+                                        background: '#fff', borderRadius: 'var(--radius-md)',
+                                        margin: '0 auto 16px',
+                                        padding: '8px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        <img
+                                            src={`data:image/png;base64,${pixData.qr_code_base64}`}
+                                            alt="QR Code Pix"
+                                            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div style={{
+                                        width: '200px', height: '200px',
+                                        background: '#fff', borderRadius: 'var(--radius-md)',
+                                        margin: '0 auto 16px',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: '#666', fontSize: '0.75rem', textAlign: 'center', padding: '16px',
+                                    }}>
+                                        <div className="spinner" style={{ borderColor: '#ccc', borderTopColor: '#333' }} />
+                                    </div>
+                                )}
+
+                                {/* Pix Copy-Paste Code */}
+                                {pixData?.qr_code && (
+                                    <div style={{ display: 'flex', gap: '8px', maxWidth: '400px', margin: '0 auto' }}>
+                                        <input
+                                            className="form-input"
+                                            value={pixData.qr_code}
+                                            readOnly
+                                            style={{ flex: 1, fontSize: '0.7rem', textAlign: 'center', fontFamily: 'monospace' }}
+                                        />
+                                        <button
+                                            className={`btn ${copied ? 'btn-primary' : 'btn-outline-gold'} btn-sm`}
+                                            onClick={handleCopy}
+                                            style={{ minWidth: '80px' }}
+                                        >
+                                            {copied ? '✓ Copiado!' : 'Copiar'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>

@@ -161,7 +161,7 @@ export default function ProductDetailPage() {
 
     const handleBuy = () => {
         const variationParam = selectedVariation ? `&variacao=${selectedVariation.id}&variacao_nome=${encodeURIComponent(selectedVariation.name)}` : '';
-        router.push(`/checkout?produto=${product.id}&preco=${currentPrice}${variationParam}`);
+        router.push(`/checkout?produto=${product.id}&preco=${currentPrice}&qty=${quantity}${variationParam}`);
     };
 
     return (

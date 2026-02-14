@@ -6,22 +6,16 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Product } from '@/lib/types';
 
-const DEMO_PRODUCTS: Record<string, Product> = {
-    '1': { id: '1', name: 'Netflix Premium', description: '', price: 19.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 50, features: [], created_at: '', updated_at: '' },
-    '2': { id: '2', name: 'Spotify Premium', description: '', price: 9.90, image_url: '', category: 'Música', duration: '30 dias', is_active: true, stock: 100, features: [], created_at: '', updated_at: '' },
-    '3': { id: '3', name: 'Disney+ Premium', description: '', price: 14.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 30, features: [], created_at: '', updated_at: '' },
-    '4': { id: '4', name: 'IPTV Full HD', description: '', price: 29.90, image_url: '', category: 'IPTV', duration: '30 dias', is_active: true, stock: 200, features: [], created_at: '', updated_at: '' },
-    '5': { id: '5', name: 'HBO Max', description: '', price: 14.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 40, features: [], created_at: '', updated_at: '' },
-    '6': { id: '6', name: 'Crunchyroll Premium', description: '', price: 9.90, image_url: '', category: 'Streaming', duration: '30 dias', is_active: true, stock: 60, features: [], created_at: '', updated_at: '' },
-};
-
 function CheckoutContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const productId = searchParams.get('produto') || '1';
+    const productId = searchParams.get('produto') || '';
     const variationId = searchParams.get('variacao');
     const variationName = searchParams.get('variacao_nome');
     const priceParam = searchParams.get('preco');
+    const qtyParam = searchParams.get('qty');
+
+    const quantity = Math.max(1, parseInt(qtyParam || '1', 10));
 
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
@@ -35,18 +29,19 @@ function CheckoutContent() {
 
     useEffect(() => {
         async function fetchProduct() {
+            if (!productId) {
+                setLoading(false);
+                return;
+            }
             try {
                 const res = await fetch(`/api/products/${productId}`);
                 if (res.ok) {
                     const data = await res.json();
                     setProduct(data);
-                    setLoading(false);
-                    return;
                 }
             } catch {
-                // fallback
+                // ignore
             }
-            setProduct(DEMO_PRODUCTS[productId] || null);
             setLoading(false);
         }
         fetchProduct();
@@ -63,7 +58,6 @@ function CheckoutContent() {
         setSubmitting(true);
 
         try {
-            // Try API first
             const res = await fetch('/api/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -71,6 +65,7 @@ function CheckoutContent() {
                     product_id: product?.id,
                     variation_id: variationId,
                     variation_name: variationName ? decodeURIComponent(variationName) : undefined,
+                    quantity,
                     customer_name: formData.name,
                     customer_email: formData.email,
                     customer_whatsapp: formData.whatsapp,
@@ -79,6 +74,14 @@ function CheckoutContent() {
 
             if (res.ok) {
                 const data = await res.json();
+                // Store Pix data in sessionStorage so the order page can display it
+                if (data.qr_code_base64 || data.qr_code) {
+                    sessionStorage.setItem(`pix_${data.order_id}`, JSON.stringify({
+                        qr_code_base64: data.qr_code_base64,
+                        qr_code: data.qr_code,
+                        total: data.total,
+                    }));
+                }
                 router.push(`/pedido/${data.order_id}`);
                 return;
             } else {
@@ -87,13 +90,10 @@ function CheckoutContent() {
                 setSubmitting(false);
                 return;
             }
-        } catch {
-            // Demo mode fallthrough
+        } catch (error: any) {
+            alert(`Erro: ${error.message || 'Erro ao processar pedido'}`);
+            setSubmitting(false);
         }
-
-        // Demo: simulate order creation
-        const demoId = 'demo-' + Date.now();
-        router.push(`/pedido/${demoId}`);
     };
 
     if (loading) {
@@ -117,7 +117,8 @@ function CheckoutContent() {
         );
     }
 
-    const displayPrice = priceParam ? parseFloat(priceParam) : product.price;
+    const unitPrice = priceParam ? parseFloat(priceParam) : product.price;
+    const totalPrice = unitPrice * quantity;
 
     return (
         <section className="checkout">
@@ -199,7 +200,7 @@ function CheckoutContent() {
                                 className="btn btn-primary btn-lg btn-block"
                                 disabled={submitting}
                             >
-                                {submitting ? 'Processando...' : `Pagar R$ ${displayPrice.toFixed(2)} via Pix`}
+                                {submitting ? 'Processando...' : `Pagar R$ ${totalPrice.toFixed(2)} via Pix`}
                             </button>
                         </form>
                     </div>
@@ -210,26 +211,35 @@ function CheckoutContent() {
 
                         <div className="checkout-item">
                             <div className="checkout-item-image">
-                                <div style={{
-                                    width: '100%', height: '100%',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    background: 'var(--bg-secondary)',
-                                    fontSize: '1.5rem',
-                                }}>
-                                    {product.category === 'Música' ? '🎵' : product.category === 'IPTV' ? '📺' : '🎬'}
-                                </div>
+                                {product.image_url ? (
+                                    <img src={product.image_url} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }} />
+                                ) : (
+                                    <div style={{
+                                        width: '100%', height: '100%',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        background: 'var(--bg-secondary)',
+                                        fontSize: '1.5rem',
+                                    }}>
+                                        {product.category === 'Música' ? '🎵' : product.category === 'IPTV' ? '📺' : '🎬'}
+                                    </div>
+                                )}
                             </div>
                             <div className="checkout-item-info">
                                 <div className="checkout-item-name">{product.name}</div>
                                 {variationName && <div style={{ fontSize: '0.9rem', color: 'var(--accent-gold)' }}>{decodeURIComponent(variationName)}</div>}
                                 <div className="checkout-item-plan">{product.duration}</div>
+                                {quantity > 1 && (
+                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        {quantity}x R$ {unitPrice.toFixed(2)}
+                                    </div>
+                                )}
                             </div>
-                            <div className="checkout-item-price">R$ {displayPrice.toFixed(2)}</div>
+                            <div className="checkout-item-price">R$ {totalPrice.toFixed(2)}</div>
                         </div>
 
                         <div className="checkout-total">
                             <span>Total</span>
-                            <span className="checkout-total-value">R$ {displayPrice.toFixed(2)}</span>
+                            <span className="checkout-total-value">R$ {totalPrice.toFixed(2)}</span>
                         </div>
 
                         <div style={{
