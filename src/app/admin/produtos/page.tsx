@@ -167,7 +167,7 @@ export default function AdminProductsPage() {
             <main className="admin-content">
                 <div className="admin-header">
                     <div>
-                        <h1 className="admin-title">Produtos (v2.0 Fix)</h1>
+                        <h1 className="admin-title">Produtos</h1>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
                             Gerencie seus produtos e variações
                         </p>
@@ -249,7 +249,7 @@ export default function AdminProductsPage() {
                 {/* Modal */}
                 {showModal && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
                             <div className="modal-header">
                                 <h3 className="modal-title">{editingProduct ? 'Editar Produto' : 'Novo Produto'}</h3>
                                 <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
@@ -317,7 +317,7 @@ export default function AdminProductsPage() {
                                         </label>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
                                             {variations.map((v, idx) => (
-                                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '12px', alignItems: 'end', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                                                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 42px', gap: '12px', alignItems: 'end', padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                                     <div style={{ gridColumn: '1 / -1' }}>
                                                         <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome da Variação (Ex: 1 Tela, Mensal)</label>
                                                         <input type="text" className="form-input" placeholder="Nome da opção" value={v.name} onChange={e => handleVariationChange(idx, 'name', e.target.value)} required />

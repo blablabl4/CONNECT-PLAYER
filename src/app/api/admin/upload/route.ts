@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { randomUUID } from 'crypto';
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -25,22 +22,10 @@ export async function POST(request: NextRequest) {
 
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
+        const base64 = buffer.toString('base64');
+        const dataUrl = `data:${file.type};base64,${base64}`;
 
-        // Generate unique filename
-        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-        const filename = `${randomUUID()}.${ext}`;
-
-        // Ensure uploads directory exists
-        const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
-        await mkdir(uploadsDir, { recursive: true });
-
-        // Write file
-        const filepath = path.join(uploadsDir, filename);
-        await writeFile(filepath, buffer);
-
-        // Return the public URL
-        const url = `/uploads/${filename}`;
-        return NextResponse.json({ url });
+        return NextResponse.json({ url: dataUrl });
     } catch (error) {
         console.error('Upload error:', error);
         return NextResponse.json({ error: 'Erro ao fazer upload' }, { status: 500 });
