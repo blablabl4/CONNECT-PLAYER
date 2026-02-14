@@ -20,7 +20,7 @@ export async function GET() {
             }),
         ]);
 
-        const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.total), 0);
+        const totalRevenue = paidOrders.reduce((sum: number, o: { total: any }) => sum + Number(o.total), 0);
 
         return NextResponse.json({
             stats: {
@@ -31,7 +31,7 @@ export async function GET() {
                 todayOrders: 0,
                 todayRevenue: 0,
             },
-            recentOrders: recentOrders.map(o => ({
+            recentOrders: recentOrders.map((o: any) => ({
                 id: o.id,
                 customer_name: o.customer_name,
                 customer_email: o.customer_email,

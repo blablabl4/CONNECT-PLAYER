@@ -21,7 +21,7 @@ export async function GET(
         return NextResponse.json({
             ...product,
             price: Number(product.price),
-            variations: product.variations.map(v => ({
+            variations: product.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,

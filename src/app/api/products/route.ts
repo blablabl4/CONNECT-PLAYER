@@ -12,11 +12,11 @@ export async function GET() {
         });
 
         // Convert Decimal to number for JSON serialization
-        const serialized = products.map(p => ({
+        const serialized = products.map((p: any) => ({
             ...p,
             price: Number(p.price),
             original_price: p.price ? Number(p.price) : undefined,
-            variations: p.variations.map(v => ({
+            variations: p.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
