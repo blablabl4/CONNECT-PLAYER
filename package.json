@@ -6,7 +6,7 @@
     "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "prestart": "prisma db push --skip-generate",
+    "prestart": "prisma db push --skip-generate || true",
     "start": "next start",
     "lint": "eslint"
   },
