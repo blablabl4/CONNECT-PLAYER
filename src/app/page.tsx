@@ -139,7 +139,7 @@ export default function HomePage() {
                 <div className="category-card-glow" />
                 <div className="category-card-icon">{cat.icon}</div>
                 <div className="category-card-name">{cat.name}</div>
-                <div className="category-card-count">{cat.count} produtos</div>
+                <div className="category-card-count">{products.filter(p => p.category === cat.name).length} produtos</div>
               </div>
             ))}
           </div>
