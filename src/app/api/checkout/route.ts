@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
                     pending: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/?status=pending`,
                 },
                 auto_return: 'approved',
-                notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://seu-dominio.com'}/api/webhooks/mercadopago`,
+                notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://connectplayer.com.br'}/api/webhook/payment`,
             },
         });
 

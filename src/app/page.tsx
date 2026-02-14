@@ -7,46 +7,6 @@ import ProductCard from '@/components/ProductCard';
 import ParticleBackground from '@/components/ParticleBackground';
 import { Product } from '@/lib/types';
 
-// Demo products
-const DEMO_PRODUCTS: Product[] = [
-  {
-    id: '1', name: 'Netflix Compartilhada',
-    description: 'Tela Ultra HD 4K, até 4 telas simultâneas. Acesso completo ao catálogo.',
-    price: 7.99, original_price: 11.99, image_url: '', category: 'Streaming', duration: '30 dias',
-    is_active: true, stock: 50, features: [], variations: [], created_at: '', updated_at: '',
-  },
-  {
-    id: '2', name: 'Spotify Individual',
-    description: 'Música sem anúncios, qualidade máxima, downloads offline.',
-    price: 5.99, original_price: 9.99, image_url: '', category: 'Música', duration: '30 dias',
-    is_active: true, stock: 100, features: [], variations: [], created_at: '', updated_at: '',
-  },
-  {
-    id: '3', name: 'Disney+ Compartilhada',
-    description: 'Marvel, Star Wars, Pixar. Conteúdo exclusivo em 4K HDR.',
-    price: 6.99, original_price: 10.99, image_url: '', category: 'Streaming', duration: '30 dias',
-    is_active: true, stock: 30, features: [], variations: [], created_at: '', updated_at: '',
-  },
-  {
-    id: '4', name: 'IPTV Full HD',
-    description: '+5000 canais ao vivo, filmes e séries on demand. Suporte 24h.',
-    price: 19.99, original_price: 29.99, image_url: '', category: 'IPTV', duration: '30 dias',
-    is_active: true, stock: 200, features: [], variations: [], created_at: '', updated_at: '',
-  },
-  {
-    id: '5', name: 'HBO Compartilhada',
-    description: 'Filmes recém-lançados, séries exclusivas. Qualidade até 4K.',
-    price: 7.99, original_price: 11.99, image_url: '', category: 'Streaming', duration: '30 dias',
-    is_active: true, stock: 40, features: [], variations: [], created_at: '', updated_at: '',
-  },
-  {
-    id: '6', name: 'Crunchyroll Fan',
-    description: 'Animes sem anúncios, biblioteca completa, simulcast do Japão.',
-    price: 5.99, original_price: 9.99, image_url: '', category: 'Streaming', duration: '30 dias',
-    is_active: true, stock: 60, features: [], variations: [], created_at: '', updated_at: '',
-  },
-];
-
 const CATEGORIES = [
   { icon: '🎬', name: 'Streaming', count: 8, color: '#E50914' },
   { icon: '🎵', name: 'Música', count: 4, color: '#1DB954' },
@@ -64,9 +24,10 @@ const STEPS = [
 ];
 
 export default function HomePage() {
-  const [products, setProducts] = useState<Product[]>(DEMO_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   // Auto-advance carousel
   useEffect(() => {
@@ -82,15 +43,34 @@ export default function HomePage() {
         const res = await fetch('/api/products');
         if (res.ok) {
           const data = await res.json();
-          if (data && data.length > 0) {
-            setProducts(data);
-          }
+          setProducts(data || []);
         }
       } catch {
-        // Use demo products if API is not available
+        // API not available
+      } finally {
+        setLoading(false);
       }
     }
     fetchProducts();
+
+    // Track affiliate visit
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const ref = params.get('ref');
+      if (ref) {
+        fetch('/api/affiliates/visit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: ref,
+            page: window.location.pathname,
+            user_agent: navigator.userAgent,
+          }),
+        }).catch(() => { });
+        // Store ref in localStorage for future reference
+        localStorage.setItem('affiliate_ref', ref);
+      }
+    }
   }, []);
 
   const handleCategoryClick = (categoryName: string) => {

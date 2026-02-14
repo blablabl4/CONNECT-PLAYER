@@ -3,31 +3,24 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function clean() {
+    console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'SET (' + process.env.DATABASE_URL.substring(0, 30) + '...)' : 'NOT SET');
     console.log('Cleaning database...');
     try {
-        // Delete in order to respect foreign keys (though cascade might handle it)
-        // Order depends on Product, Credential depends on Product/Variation
+        const orders = await prisma.order.deleteMany({});
+        console.log(`Deleted ${orders.count} orders`);
 
-        // 1. Delete Orders (if any, to be safe, or keep them? User said "Fake do site produto categoria", implies products)
-        // Let's delete orders too to be 100% clean
-        await prisma.order.deleteMany({});
-        console.log('Orders deleted.');
+        const creds = await prisma.credential.deleteMany({});
+        console.log(`Deleted ${creds.count} credentials`);
 
-        // 2. Delete Credentials
-        await prisma.credential.deleteMany({});
-        console.log('Credentials deleted.');
+        const vars = await prisma.productVariation.deleteMany({});
+        console.log(`Deleted ${vars.count} variations`);
 
-        // 3. Delete Variations
-        await prisma.productVariation.deleteMany({});
-        console.log('Variations deleted.');
+        const prods = await prisma.product.deleteMany({});
+        console.log(`Deleted ${prods.count} products`);
 
-        // 4. Delete Products
-        await prisma.product.deleteMany({});
-        console.log('Products deleted.');
-
-        console.log('Database cleaned successfully.');
-    } catch (e) {
-        console.error('Error cleaning database:', e);
+        console.log('✅ Database cleaned!');
+    } catch (err) {
+        console.error('Error:', err.message);
     } finally {
         await prisma.$disconnect();
     }

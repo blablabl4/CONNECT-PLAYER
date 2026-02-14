@@ -143,9 +143,14 @@ export default function AdminProductsPage() {
                 body: JSON.stringify(payload),
             });
 
-            if (!res.ok) throw new Error('Save failed');
-        } catch (err) {
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'Erro ao salvar produto');
+            }
+            alert('Produto salvo com sucesso!');
+        } catch (err: any) {
             console.error(err);
+            alert(err.message || 'Erro ao salvar produto. Verifique a conexão com o banco de dados.');
         }
 
         setShowModal(false);
