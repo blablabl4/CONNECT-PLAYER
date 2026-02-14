@@ -54,7 +54,6 @@ export async function POST(req: NextRequest) {
             data: {
                 product_id: product.id,
                 variation_id: variationId || null,
-                product_name: product.name,
                 variation_name: variationName || null,
                 customer_name: name,
                 customer_email: email,
