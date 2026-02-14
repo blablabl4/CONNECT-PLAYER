@@ -9,7 +9,7 @@ export async function GET() {
         const settings = await prisma.setting.findMany();
         // Convert to key-value object
         const result: Record<string, string> = {};
-        settings.forEach(s => { result[s.key] = s.value; });
+        settings.forEach((s: { key: string; value: string }) => { result[s.key] = s.value; });
         return NextResponse.json(result);
     } catch (error) {
         console.error('Admin settings GET error:', error);
