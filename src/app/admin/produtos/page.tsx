@@ -167,7 +167,7 @@ export default function AdminProductsPage() {
             <main className="admin-content">
                 <div className="admin-header">
                     <div>
-                        <h1 className="admin-title">Produtos</h1>
+                        <h1 className="admin-title">Produtos (v2.0 Fix)</h1>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
                             Gerencie seus produtos e variações
                         </p>

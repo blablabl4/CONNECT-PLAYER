@@ -1,65 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { mpPreference } from '@/lib/mercadopago';
 
-export const dynamic = 'force-dynamic';
-
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
     try {
-        const body = await request.json();
-        const { product_id, variation_id, variation_name, customer_name, customer_email, customer_whatsapp } = body;
+        const body = await req.json();
 
-        if (!product_id || !customer_name || !customer_email) {
+
+        // Handle both camelCase and snake_case for compatibility
+        const productId = body.productId || body.product_id;
+        const email = body.email || body.customer_email;
+        const name = body.name || body.customer_name;
+        const whatsapp = body.whatsapp || body.customer_whatsapp;
+
+        if (!productId || !email || !name) {
             return NextResponse.json(
-                { error: 'Campos obrigatórios: product_id, customer_name, customer_email' },
+                { error: 'Dados incompletos: Nome, Email e Produto são obrigatórios.' },
                 { status: 400 }
             );
         }
 
-        // Fetch product
-        const product = await prisma.product.findFirst({
-            where: { id: product_id, is_active: true },
+        // 1. Fetch Product
+        const product = await prisma.product.findUnique({
+            where: { id: productId },
         });
 
         if (!product) {
-            return NextResponse.json({ error: 'Produto não encontrado ou indisponível' }, { status: 404 });
+            return NextResponse.json(
+                { error: 'Produto não encontrado' },
+                { status: 404 }
+            );
         }
 
-        // Check stock (available credentials)
-        const stockCount = await prisma.credential.count({
-            where: {
-                product_id,
-                is_used: false,
-                ...(variation_id ? { variation_id } : {}),
-            },
-        });
-
-        if (stockCount === 0) {
-            return NextResponse.json({ error: 'Produto/Variação sem estoque disponível' }, { status: 400 });
-        }
-
-        // Create order
+        // 2. Create Pending Order
         const order = await prisma.order.create({
             data: {
-                product_id,
-                variation_id: variation_id || null,
-                variation_name: variation_name || null,
-                customer_name,
-                customer_email,
-                customer_whatsapp: customer_whatsapp || '',
+                product_id: product.id,
+                customer_name: name,
+                customer_email: email,
+                customer_whatsapp: whatsapp || '',
+                total: product.price,
                 status: 'pending',
-                payment_method: 'pix',
-                total: Number(product.price),
             },
         });
 
-        return NextResponse.json({
-            order_id: order.id,
-            total: Number(product.price),
-            pix_qr_code: '',
-            pix_code: '',
+        // 3. Create Mercado Pago Preference
+        const result = await mpPreference.create({
+            body: {
+                items: [
+                    {
+                        id: product.id,
+                        title: product.name,
+                        quantity: 1,
+                        unit_price: Number(product.price),
+                        currency_id: 'BRL',
+                    },
+                ],
+                payer: {
+                    email: email,
+                    name: name,
+                },
+                external_reference: order.id,
+                back_urls: {
+                    success: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/success?order_id=${order.id}`,
+                    failure: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/?status=failure`,
+                    pending: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/?status=pending`,
+                },
+                auto_return: 'approved',
+                notification_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://seu-dominio.com'}/api/webhooks/mercadopago`,
+            },
         });
+
+        if (!result.init_point) {
+            throw new Error('Falha ao criar preferência de pagamento');
+        }
+
+        // 4. Update Order with Payment Link (optional, or just return it)
+        await prisma.order.update({
+            where: { id: order.id },
+            data: { payment_id: result.id }, // Storing Preference ID as payment_id initially
+        });
+
+        return NextResponse.json({ url: result.init_point, order_id: order.id });
     } catch (error) {
-        console.error('Checkout error:', error);
-        return NextResponse.json({ error: 'Erro ao processar pedido' }, { status: 500 });
+        console.error('Checkout Error:', error);
+        return NextResponse.json(
+            { error: 'Erro ao processar checkout' },
+            { status: 500 }
+        );
     }
 }
