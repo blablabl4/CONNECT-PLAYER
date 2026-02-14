@@ -7,14 +7,16 @@ import ProductCard from '@/components/ProductCard';
 import ParticleBackground from '@/components/ParticleBackground';
 import { Product } from '@/lib/types';
 
-const CATEGORIES = [
-  { icon: '🎬', name: 'Streaming', count: 8, color: '#E50914' },
-  { icon: '🎵', name: 'Música', count: 4, color: '#1DB954' },
-  { icon: '📺', name: 'IPTV', count: 6, color: '#7C3AED' },
-  { icon: '🎮', name: 'Games', count: 3, color: '#2563EB' },
-  { icon: '☁️', name: 'Cloud', count: 2, color: '#0EA5E9' },
-  { icon: '🔒', name: 'VPN', count: 3, color: '#F59E0B' },
-];
+interface Category {
+  icon: string;
+  name: string;
+  color: string;
+}
+
+interface Banner {
+  url: string;
+  alt: string;
+}
 
 const STEPS = [
   { icon: '🔍', title: 'Escolha seu produto', desc: 'Navegue pelo nosso catálogo e encontre o serviço ideal para você.' },
@@ -25,33 +27,40 @@ const STEPS = [
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Auto-advance carousel
+  const bannerCount = banners.length || 1;
   useEffect(() => {
+    if (bannerCount <= 1) return;
     const timer = setInterval(() => {
-      setCarouselIndex(prev => (prev + 1) % 2);
+      setCarouselIndex(prev => (prev + 1) % bannerCount);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [bannerCount]);
 
   useEffect(() => {
-    async function fetchProducts() {
+    async function fetchData() {
       try {
-        const res = await fetch('/api/products');
-        if (res.ok) {
-          const data = await res.json();
-          setProducts(data || []);
-        }
+        const [prodRes, catRes, banRes] = await Promise.all([
+          fetch('/api/products'),
+          fetch('/api/admin/categories'),
+          fetch('/api/admin/banners'),
+        ]);
+        if (prodRes.ok) setProducts(await prodRes.json() || []);
+        if (catRes.ok) setCategories(await catRes.json() || []);
+        if (banRes.ok) setBanners(await banRes.json() || []);
       } catch {
         // API not available
       } finally {
         setLoading(false);
       }
     }
-    fetchProducts();
+    fetchData();
 
     // Track affiliate visit
     if (typeof window !== 'undefined') {
@@ -92,27 +101,32 @@ export default function HomePage() {
       <ParticleBackground />
 
       {/* Banner Carousel */}
-      <section className="hp-carousel">
-        <div className="hp-carousel-track" style={{ transform: `translateX(-${carouselIndex * 100}%)` }}>
-          <div className="hp-slide">
-            <img src="/banners/banner1.jpg" alt="Contas Premium" className="hp-slide-img" />
+      {banners.length > 0 && (
+        <section className="hp-carousel">
+          <div className="hp-carousel-track" style={{ transform: `translateX(-${carouselIndex * 100}%)` }}>
+            {banners.map((b, i) => (
+              <div key={i} className="hp-slide">
+                <img src={b.url} alt={b.alt} className="hp-slide-img" />
+              </div>
+            ))}
           </div>
-          <div className="hp-slide">
-            <img src="/banners/banner2.jpg" alt="Contas Premium" className="hp-slide-img" />
-          </div>
-        </div>
-        <div className="hp-carousel-dots">
-          {[0, 1].map(i => (
-            <button
-              key={i}
-              className={`hp-carousel-dot ${carouselIndex === i ? 'active' : ''}`}
-              onClick={() => setCarouselIndex(i)}
-            />
-          ))}
-        </div>
-        <button className="hp-carousel-arrow hp-carousel-prev" onClick={() => setCarouselIndex(p => p === 0 ? 1 : p - 1)}>‹</button>
-        <button className="hp-carousel-arrow hp-carousel-next" onClick={() => setCarouselIndex(p => p === 1 ? 0 : p + 1)}>›</button>
-      </section>
+          {banners.length > 1 && (
+            <>
+              <div className="hp-carousel-dots">
+                {banners.map((_, i) => (
+                  <button
+                    key={i}
+                    className={`hp-carousel-dot ${carouselIndex === i ? 'active' : ''}`}
+                    onClick={() => setCarouselIndex(i)}
+                  />
+                ))}
+              </div>
+              <button className="hp-carousel-arrow hp-carousel-prev" onClick={() => setCarouselIndex(p => p === 0 ? banners.length - 1 : p - 1)}>‹</button>
+              <button className="hp-carousel-arrow hp-carousel-next" onClick={() => setCarouselIndex(p => (p + 1) % banners.length)}>›</button>
+            </>
+          )}
+        </section>
+      )}
 
       {/* Categories — horizontal row */}
       <section className="hp-section" id="categorias">
@@ -129,7 +143,7 @@ export default function HomePage() {
             )}
           </div>
           <div className="categories-grid">
-            {CATEGORIES.map((cat) => (
+            {categories.map((cat) => (
               <div
                 key={cat.name}
                 className={`category-card ${activeCategory === cat.name ? 'active' : ''}`}

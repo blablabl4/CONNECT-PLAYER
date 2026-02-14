@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 const NAV_ITEMS = [
     { href: '/admin', icon: '📊', label: 'Dashboard' },
     { href: '/admin/produtos', icon: '📦', label: 'Produtos' },
+    { href: '/admin/categorias', icon: '🏷️', label: 'Categorias' },
+    { href: '/admin/banners', icon: '🖼️', label: 'Banners' },
     { href: '/admin/pedidos', icon: '🛒', label: 'Pedidos' },
     { href: '/admin/credenciais', icon: '🔑', label: 'Credenciais' },
     { href: '/admin/afiliados', icon: '🤝', label: 'Afiliados' },

@@ -21,6 +21,7 @@ export default function AdminProductsPage() {
     const [featuresText, setFeaturesText] = useState('');
     const [loading, setLoading] = useState(false);
     const [hasVariations, setHasVariations] = useState(false);
+    const [categories, setCategories] = useState<{ icon: string; name: string; color: string }[]>([]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('admin_auth')) {
@@ -28,6 +29,7 @@ export default function AdminProductsPage() {
             return;
         }
         fetchProducts();
+        fetch('/api/admin/categories').then(r => r.json()).then(setCategories).catch(() => { });
     }, [router]);
 
     async function fetchProducts() {
@@ -269,13 +271,15 @@ export default function AdminProductsPage() {
                                     <label className="form-label">Categoria *</label>
                                     <select className="form-input" required value={formData.category} onChange={e => setFormData(p => ({ ...p, category: e.target.value }))}>
                                         <option value="">Selecione</option>
-                                        <option value="Streaming">Streaming</option>
-                                        <option value="Música">Música</option>
-                                        <option value="IPTV">IPTV</option>
-                                        <option value="Games">Games</option>
-                                        <option value="Cloud">Cloud</option>
-                                        <option value="VPN">VPN</option>
+                                        {categories.map(c => (
+                                            <option key={c.name} value={c.name}>{c.icon} {c.name}</option>
+                                        ))}
                                     </select>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Descrição do Produto</label>
+                                    <textarea className="form-input" rows={3} placeholder="Descreva o produto, seus benefícios, detalhes..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical', minHeight: '80px' }} />
                                 </div>
 
                                 {/* Variations Toggle */}
@@ -326,6 +330,10 @@ export default function AdminProductsPage() {
                                                     <div style={{ gridColumn: '1 / -1' }}>
                                                         <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome da Variação (Ex: 1 Tela, Mensal)</label>
                                                         <input type="text" className="form-input" placeholder="Nome da opção" value={v.name} onChange={e => handleVariationChange(idx, 'name', e.target.value)} required />
+                                                    </div>
+                                                    <div style={{ gridColumn: '1 / -1' }}>
+                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Descrição da Variação</label>
+                                                        <textarea className="form-input" rows={2} placeholder="Descrição específica desta variação..." value={v.description || ''} onChange={e => handleVariationChange(idx, 'description', e.target.value)} style={{ resize: 'vertical', minHeight: '50px', fontSize: '0.85rem' }} />
                                                     </div>
                                                     <div>
                                                         <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$)</label>
