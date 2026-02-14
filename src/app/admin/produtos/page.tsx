@@ -256,7 +256,7 @@ export default function AdminProductsPage() {
                 {/* Modal */}
                 {showModal && (
                     <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '900px', maxHeight: '90vh', overflowY: 'auto' }}>
                             <div className="modal-header">
                                 <h3 className="modal-title">{editingProduct ? 'Editar Produto' : 'Novo Produto'}</h3>
                                 <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
