@@ -1,6 +1,37 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
+interface PublicSettings {
+    store_name: string;
+    store_email: string;
+    whatsapp: string;
+    instagram: string;
+}
+
 export default function Footer() {
+    const [settings, setSettings] = useState<PublicSettings | null>(null);
+
+    useEffect(() => {
+        fetch('/api/settings')
+            .then(r => r.json())
+            .then(setSettings)
+            .catch(() => { });
+    }, []);
+
+    const whatsappUrl = settings?.whatsapp
+        ? `https://wa.me/${settings.whatsapp.replace(/\D/g, '')}`
+        : '#';
+
+    const instagramUrl = settings?.instagram
+        ? `https://instagram.com/${settings.instagram.replace('@', '')}`
+        : '#';
+
+    const emailUrl = settings?.store_email
+        ? `mailto:${settings.store_email}`
+        : '#';
+
     return (
         <footer className="footer">
             <div className="container">
@@ -39,15 +70,21 @@ export default function Footer() {
                     <div>
                         <h4 className="footer-title">Contato</h4>
                         <div className="footer-links">
-                            <a href="#">WhatsApp</a>
-                            <a href="#">Instagram</a>
-                            <a href="#">E-mail</a>
+                            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer">
+                                WhatsApp
+                            </a>
+                            <a href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                                Instagram
+                            </a>
+                            <a href={emailUrl}>
+                                E-mail
+                            </a>
                         </div>
                     </div>
                 </div>
 
                 <div className="footer-bottom">
-                    <span>© {new Date().getFullYear()} Connect Player. Todos os direitos reservados.</span>
+                    <span>© {new Date().getFullYear()} {settings?.store_name || 'Connect Player'}. Todos os direitos reservados.</span>
                     <span>Feito com ⚡ no Brasil</span>
                 </div>
             </div>
