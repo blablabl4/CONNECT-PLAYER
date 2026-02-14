@@ -46,6 +46,26 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Check stock (available credentials)
+        const availableCredentials = await prisma.credential.count({
+            where: {
+                product_id: product.id,
+                is_used: false,
+                ...(variationId ? { variation_id: variationId } : {}),
+            },
+        });
+
+        if (availableCredentials < quantity) {
+            return NextResponse.json(
+                {
+                    error: availableCredentials === 0
+                        ? 'Produto esgotado! Sem credenciais disponíveis no momento.'
+                        : `Estoque insuficiente. Disponível: ${availableCredentials} unidade(s).`
+                },
+                { status: 400 }
+            );
+        }
+
         // Calculate total
         const totalAmount = Math.round(unitPrice * quantity * 100) / 100;
 
