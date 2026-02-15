@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
                 stock: stock || 0,
                 features: features || [],
                 variations: variations?.length ? {
-                    create: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string; stock?: number }) => ({
+                    create: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string; stock?: number; credential_id?: string }) => ({
                         name: v.name,
                         description: v.description || null,
                         price: v.price,
@@ -77,6 +77,22 @@ export async function POST(request: NextRequest) {
             },
             include: { variations: true },
         });
+
+        // Link credentials to variations if provided
+        if (variations?.length) {
+            for (let i = 0; i < variations.length; i++) {
+                const v = variations[i];
+                if (v.credential_id && product.variations[i]) {
+                    await prisma.credential.update({
+                        where: { id: v.credential_id },
+                        data: {
+                            product_id: product.id,
+                            variation_id: product.variations[i].id,
+                        },
+                    });
+                }
+            }
+        }
 
         return NextResponse.json({
             ...product,
@@ -139,9 +155,20 @@ export async function PUT(request: NextRequest) {
                             stock: v.stock || 0,
                         },
                     });
+
+                    // Link credential if provided
+                    if (v.credential_id) {
+                        await prisma.credential.update({
+                            where: { id: v.credential_id },
+                            data: {
+                                product_id: id,
+                                variation_id: v.id,
+                            },
+                        });
+                    }
                 } else {
                     // Create new variation
-                    await prisma.productVariation.create({
+                    const newVariation = await prisma.productVariation.create({
                         data: {
                             product_id: id,
                             name: v.name,
@@ -152,6 +179,17 @@ export async function PUT(request: NextRequest) {
                             stock: v.stock || 0,
                         },
                     });
+
+                    // Link credential if provided
+                    if (v.credential_id) {
+                        await prisma.credential.update({
+                            where: { id: v.credential_id },
+                            data: {
+                                product_id: id,
+                                variation_id: newVariation.id,
+                            },
+                        });
+                    }
                 }
             }
         }

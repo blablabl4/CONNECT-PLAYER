@@ -11,6 +11,7 @@ export interface ProductVariation {
     badge?: string;
     duration: string | null;
     stock: number;
+    credential_id?: string | null;
     created_at?: string;
 }
 

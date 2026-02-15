@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { Product, ProductVariation } from '@/lib/types';
+import { Product, ProductVariation, Credential } from '@/lib/types';
 
 const EMPTY_PRODUCT: Partial<Product> = {
     name: '', description: '', price: 0, image_url: '',
@@ -14,6 +14,7 @@ const EMPTY_PRODUCT: Partial<Product> = {
 export default function AdminProductsPage() {
     const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
+    const [credentials, setCredentials] = useState<Credential[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<Partial<Product>>(EMPTY_PRODUCT);
@@ -46,16 +47,17 @@ export default function AdminProductsPage() {
         setProducts([]);
     }
 
-    const openNewProduct = () => {
+    const openNewProduct = async () => {
         setEditingProduct(null);
         setFormData(EMPTY_PRODUCT);
         setVariations([]);
         setFeaturesText('');
         setHasVariations(false);
+        await fetchAvailableCredentials();
         setShowModal(true);
     };
 
-    const openEditProduct = (product: Product) => {
+    const openEditProduct = async (product: Product) => {
         setEditingProduct(product);
         setFormData({
             name: product.name,
@@ -73,8 +75,23 @@ export default function AdminProductsPage() {
         setVariations(existingVars);
         setHasVariations(existingVars.length > 0);
         setFeaturesText((product.features || []).join('\n'));
+        await fetchAvailableCredentials();
         setShowModal(true);
     };
+
+    async function fetchAvailableCredentials() {
+        try {
+            const res = await fetch('/api/admin/credentials');
+            if (res.ok) {
+                const allCreds = await res.json();
+                // Show only unused credentials (or currently linked to this product's variations)
+                const available = allCreds.filter((c: Credential) => !c.is_used || !c.product_id);
+                setCredentials(available);
+            }
+        } catch {
+            setCredentials([]);
+        }
+    }
 
     const handleAddVariation = () => {
         setVariations([...variations, {
@@ -363,6 +380,28 @@ export default function AdminProductsPage() {
                                                                 <option value="Vitalício">Vitalício</option>
                                                             </select>
                                                         </div>
+                                                    </div>
+                                                    {/* Credential Selection */}
+                                                    <div>
+                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Credencial (Opcional)</label>
+                                                        <select
+                                                            className="form-input"
+                                                            value={v.credential_id || ''}
+                                                            onChange={e => handleVariationChange(idx, 'credential_id', e.target.value || null)}
+                                                            style={{ fontSize: '0.85rem' }}
+                                                        >
+                                                            <option value="">Sem credencial vinculada</option>
+                                                            {credentials.map(c => (
+                                                                <option key={c.id} value={c.id}>
+                                                                    {c.email} {c.password ? `(${c.password.substring(0, 4)}...)` : ''}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        {v.credential_id && (
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                                ✓ Vinculada
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
