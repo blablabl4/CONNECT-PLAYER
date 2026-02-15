@@ -152,7 +152,7 @@ export async function PUT(request: NextRequest) {
                             price: v.price,
                             original_price: v.original_price || null,
                             duration: v.duration || null,
-                            stock: v.stock || 0,
+                            stock: v.stock !== undefined && v.stock !== null ? v.stock : 0,
                         },
                     });
 

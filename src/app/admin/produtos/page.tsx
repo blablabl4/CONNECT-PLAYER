@@ -369,7 +369,7 @@ export default function AdminProductsPage() {
                                                         </div>
                                                         <div>
                                                             <label className="form-label" style={{ fontSize: '0.8rem' }}>Estoque</label>
-                                                            <input type="number" className="form-input" placeholder="0" value={v.stock} onChange={e => handleVariationChange(idx, 'stock', parseInt(e.target.value))} />
+                                                            <input type="number" className="form-input" placeholder="0" value={v.stock || ''} onChange={e => handleVariationChange(idx, 'stock', parseInt(e.target.value) || 0)} />
                                                         </div>
                                                         <div>
                                                             <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
