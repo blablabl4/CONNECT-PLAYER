@@ -783,6 +783,16 @@ h6 {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+  align-items: stretch;
+}
+
+.hp-products-row>div {
+  display: flex;
+  flex-direction: column;
+}
+
+.hp-products-row>div .product-card {
+  height: 100%;
 }
 
 @media (max-width: 640px) {
@@ -948,21 +958,22 @@ h6 {
 
 .product-card-price-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.product-card-original-price {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 .product-card-price {
   font-family: var(--font-heading);
   font-size: 1.3rem;
   font-weight: 800;
-  color: var(--text-primary);
-}
-
-.product-card-original-price {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-decoration: line-through;
+  color: #22c55e;
 }
 
 .product-card-duration {

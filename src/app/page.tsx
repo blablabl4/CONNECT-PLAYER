@@ -143,7 +143,7 @@ export default function HomePage() {
             )}
           </div>
           <div className="categories-grid">
-            {categories.map((cat) => (
+            {categories.filter(cat => products.some(p => p.category === cat.name)).map((cat) => (
               <div
                 key={cat.name}
                 className={`category-card ${activeCategory === cat.name ? 'active' : ''}`}

@@ -146,8 +146,7 @@ export default function ProductDetailPage() {
     }
 
     const currentPrice = selectedVariation ? selectedVariation.price : product.price;
-    const originalPrice = selectedVariation ? selectedVariation.original_price : product.original_price;
-    const discount = selectedVariation ? selectedVariation.discount : 0;
+    const dePrice = currentPrice * 1.3;
     const currentStock = selectedVariation ? selectedVariation.stock : product.stock;
 
     const getCategoryEmoji = (cat: string) => {
@@ -220,7 +219,7 @@ export default function ProductDetailPage() {
                                                 </span>
                                             </div>
                                             <div className="pd-var-pricing">
-                                                {(v.discount || 0) > 0 && <span className="pd-var-old">R$ {(v.original_price || 0).toFixed(2)}</span>}
+                                                <span className="pd-var-old">De R$ {(v.price * 1.3).toFixed(2)}</span>
                                                 <span className="pd-var-price">R$ {v.price.toFixed(2)}</span>
                                             </div>
                                         </div>
@@ -234,8 +233,8 @@ export default function ProductDetailPage() {
                             <div className="pd-info-header">
                                 <h1 className="pd-info-name">{selectedVariation?.name || product.name}</h1>
                                 <div className="pd-info-price-row">
-                                    {(discount || 0) > 0 && <span className="pd-info-old">R$ {(originalPrice || 0).toFixed(2)}</span>}
-                                    {(discount || 0) > 0 && <span className="pd-info-discount">-{(discount || 0)}%</span>}
+                                    <span className="pd-info-old">De R$ {dePrice.toFixed(2)}</span>
+                                    <span className="pd-info-discount">-30%</span>
                                     <span className="pd-info-price">R$ {currentPrice.toFixed(2)}</span>
                                 </div>
                                 <span className="pd-info-delivery">⚡ Entrega Automática</span>

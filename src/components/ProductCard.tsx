@@ -29,6 +29,9 @@ export default function ProductCard({
         }
     };
 
+    // Auto-calculate "de" price: always 30% above actual price
+    const dePrice = price * 1.3;
+
     return (
         <Link href={`/produto/${id}`} className="product-card">
             {/* Image area */}
@@ -45,21 +48,17 @@ export default function ProductCard({
                         <span className="badge badge-gold">{tag}</span>
                     </div>
                 )}
-                {discount && discount > 0 && (
-                    <div className="product-card-discount-tag">
-                        -{discount}%
-                    </div>
-                )}
+                <div className="product-card-discount-tag">
+                    -30%
+                </div>
             </div>
             {/* Info area */}
             <div className="product-card-body">
                 <h3 className="product-card-title">{name}</h3>
                 <div className="product-card-pricing">
                     <div className="product-card-price-row">
+                        <span className="product-card-original-price">De R$ {dePrice.toFixed(2)}</span>
                         <span className="product-card-price">R$ {price.toFixed(2)}</span>
-                        {original_price && original_price > price && (
-                            <span className="product-card-original-price">R$ {original_price.toFixed(2)}</span>
-                        )}
                     </div>
                     <span className="product-card-duration">À vista no PIX</span>
                 </div>
