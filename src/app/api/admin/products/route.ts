@@ -30,12 +30,12 @@ export async function GET() {
         return NextResponse.json(products.map((p: any) => ({
             ...p,
             price: Number(p.price),
-            stock: stockMap.get(p.id) || 0,
+            stock: stockMap.has(p.id) ? stockMap.get(p.id)! : p.stock,
             variations: p.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
-                stock: stockMap.get(`${p.id}:${v.id}`) || 0,
+                stock: stockMap.has(`${p.id}:${v.id}`) ? stockMap.get(`${p.id}:${v.id}`)! : v.stock,
             })),
         })));
     } catch (error) {
