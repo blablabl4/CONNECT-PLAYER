@@ -69,12 +69,12 @@ export async function POST(request: NextRequest) {
         }
 
         if (mpStatus === 'approved') {
-            // Find an available credential
+            // Find an available credential — strictly match variation
             const credential = await prisma.credential.findFirst({
                 where: {
                     product_id: order.product_id,
                     is_used: false,
-                    ...(order.variation_id ? { variation_id: order.variation_id } : {}),
+                    variation_id: order.variation_id || null,
                 },
             });
 

@@ -46,12 +46,12 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Check stock (available credentials)
+        // Check stock (available credentials) — strictly match variation
         const availableCredentials = await prisma.credential.count({
             where: {
                 product_id: product.id,
                 is_used: false,
-                ...(variationId ? { variation_id: variationId } : {}),
+                variation_id: variationId || null,
             },
         });
 

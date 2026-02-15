@@ -112,22 +112,44 @@ export async function PUT(request: NextRequest) {
 
         // Handle variations update if provided
         if (variations !== undefined) {
-            // Delete existing variations
-            await prisma.productVariation.deleteMany({ where: { product_id: id } });
+            const existingVariations = product.variations;
+            const incomingIds = variations.filter((v: any) => v.id).map((v: any) => v.id);
 
-            // Create new ones
-            if (variations.length > 0) {
-                await prisma.productVariation.createMany({
-                    data: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string; stock?: number }) => ({
-                        product_id: id,
-                        name: v.name,
-                        description: v.description || null,
-                        price: v.price,
-                        original_price: v.original_price || null,
-                        duration: v.duration || null,
-                        stock: v.stock || 0,
-                    })),
-                });
+            // Delete variations that are no longer in the list
+            const toDelete = existingVariations.filter((ev: any) => !incomingIds.includes(ev.id));
+            for (const del of toDelete) {
+                await prisma.productVariation.delete({ where: { id: del.id } });
+            }
+
+            // Upsert each variation
+            for (const v of variations) {
+                if (v.id && existingVariations.some((ev: any) => ev.id === v.id)) {
+                    // Update existing — preserves credential FK
+                    await prisma.productVariation.update({
+                        where: { id: v.id },
+                        data: {
+                            name: v.name,
+                            description: v.description || null,
+                            price: v.price,
+                            original_price: v.original_price || null,
+                            duration: v.duration || null,
+                            stock: v.stock || 0,
+                        },
+                    });
+                } else {
+                    // Create new variation
+                    await prisma.productVariation.create({
+                        data: {
+                            product_id: id,
+                            name: v.name,
+                            description: v.description || null,
+                            price: v.price,
+                            original_price: v.original_price || null,
+                            duration: v.duration || null,
+                            stock: v.stock || 0,
+                        },
+                    });
+                }
             }
         }
 
