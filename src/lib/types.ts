@@ -51,7 +51,7 @@ export interface Order {
 
 export interface Credential {
     id: string;
-    product_id: string;
+    product_id?: string | null;
     variation_id?: string | null;
     email: string;
     password: string;

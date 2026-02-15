@@ -20,6 +20,9 @@ export async function GET() {
 
         const stockMap = new Map<string, number>();
         for (const c of credentialCounts) {
+            // Skip credentials without product_id (unlinked credentials)
+            if (!c.product_id) continue;
+
             if (c.variation_id) {
                 stockMap.set(`${c.product_id}:${c.variation_id}`, c._count.id);
             }
