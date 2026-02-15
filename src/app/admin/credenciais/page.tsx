@@ -15,13 +15,10 @@ type CredentialWithProduct = Credential & {
 export default function AdminCredentialsPage() {
     const router = useRouter();
     const [credentials, setCredentials] = useState<CredentialWithProduct[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState('');
-    const [selectedVariation, setSelectedVariation] = useState('');
     const [bulkText, setBulkText] = useState('');
-    const [newCred, setNewCred] = useState({ product_id: '', variation_id: '', email: '', password: '' });
+    const [newCred, setNewCred] = useState({ email: '', password: '' });
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
@@ -34,35 +31,25 @@ export default function AdminCredentialsPage() {
 
     async function fetchData() {
         try {
-            const [prodsRes, credsRes] = await Promise.all([
-                fetch('/api/admin/products'),
-                fetch('/api/admin/credentials'),
-            ]);
-
-            if (prodsRes.ok) setProducts(await prodsRes.json());
+            const credsRes = await fetch('/api/admin/credentials');
 
             if (credsRes.ok) {
                 const creds = await credsRes.json();
                 setCredentials(creds.map((c: any) => ({
                     ...c,
-                    product_name: (c.product?.name || 'N/A') + (c.variation?.name ? ` (${c.variation.name})` : ''),
+                    product_name: (c.product?.name || 'Não vinculado') + (c.variation?.name ? ` (${c.variation.name})` : ''),
                 })));
                 return;
             }
         } catch {
             // fallback
         }
-        setProducts([]);
         setCredentials([]);
     }
 
     const filteredCreds = filter === 'all' ? credentials
         : filter === 'available' ? credentials.filter(c => !c.is_used)
             : credentials.filter(c => c.is_used);
-
-    // Get current product variations
-    const currentProductIndModal = products.find(p => p.id === newCred.product_id);
-    const currentProductInBulk = products.find(p => p.id === selectedProduct);
 
     const handleAddSingle = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -71,15 +58,13 @@ export default function AdminCredentialsPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    product_id: newCred.product_id,
-                    variation_id: newCred.variation_id || null,
                     email: newCred.email,
                     password: newCred.password,
                 }),
             });
         } catch { /* ignore */ }
         setShowModal(false);
-        setNewCred({ product_id: '', variation_id: '', email: '', password: '' });
+        setNewCred({ email: '', password: '' });
         fetchData();
     };
 
@@ -88,12 +73,7 @@ export default function AdminCredentialsPage() {
         const lines = bulkText.split('\n').filter(l => l.trim());
         const creds = lines.map(line => {
             const [email, password] = line.split(/[;:,|]/).map(s => s.trim());
-            return {
-                product_id: selectedProduct,
-                variation_id: selectedVariation || null,
-                email,
-                password
-            };
+            return { email, password };
         }).filter(c => c.email && c.password);
 
         try {
@@ -107,8 +87,6 @@ export default function AdminCredentialsPage() {
         } catch { /* demo */ }
         setShowBulkModal(false);
         setBulkText('');
-        setSelectedProduct('');
-        setSelectedVariation('');
         fetchData();
     };
 
@@ -220,22 +198,6 @@ export default function AdminCredentialsPage() {
                             </div>
                             <form onSubmit={handleAddSingle}>
                                 <div className="form-group">
-                                    <label className="form-label">Produto *</label>
-                                    <select className="form-input" required value={newCred.product_id} onChange={e => setNewCred(prev => ({ ...prev, product_id: e.target.value, variation_id: '' }))}>
-                                        <option value="">Selecione</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                </div>
-                                {currentProductIndModal && currentProductIndModal.variations && currentProductIndModal.variations.length > 0 && (
-                                    <div className="form-group">
-                                        <label className="form-label">Variação *</label>
-                                        <select className="form-input" required value={newCred.variation_id} onChange={e => setNewCred(prev => ({ ...prev, variation_id: e.target.value }))}>
-                                            <option value="">Selecione</option>
-                                            {currentProductIndModal.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                                        </select>
-                                    </div>
-                                )}
-                                <div className="form-group">
                                     <label className="form-label">E-mail / Login *</label>
                                     <input type="text" className="form-input" required placeholder="usuario@exemplo.com" value={newCred.email} onChange={e => setNewCred(prev => ({ ...prev, email: e.target.value }))} />
                                 </div>
@@ -261,22 +223,6 @@ export default function AdminCredentialsPage() {
                                 <button className="modal-close" onClick={() => setShowBulkModal(false)}>✕</button>
                             </div>
                             <form onSubmit={handleBulkAdd}>
-                                <div className="form-group">
-                                    <label className="form-label">Produto *</label>
-                                    <select className="form-input" required value={selectedProduct} onChange={e => { setSelectedProduct(e.target.value); setSelectedVariation(''); }}>
-                                        <option value="">Selecione</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                    </select>
-                                </div>
-                                {currentProductInBulk && currentProductInBulk.variations && currentProductInBulk.variations.length > 0 && (
-                                    <div className="form-group">
-                                        <label className="form-label">Variação *</label>
-                                        <select className="form-input" required value={selectedVariation} onChange={e => setSelectedVariation(e.target.value)}>
-                                            <option value="">Selecione</option>
-                                            {currentProductInBulk.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                                        </select>
-                                    </div>
-                                )}
                                 <div className="form-group">
                                     <label className="form-label">Credenciais (uma por linha, formato: email;senha)</label>
                                     <textarea

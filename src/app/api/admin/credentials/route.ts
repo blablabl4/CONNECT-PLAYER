@@ -28,13 +28,13 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { product_id, variation_id, email, password } = body;
 
-        if (!product_id || !email || !password) {
-            return NextResponse.json({ error: 'product_id, email e password obrigatórios' }, { status: 400 });
+        if (!email || !password) {
+            return NextResponse.json({ error: 'email e password obrigatórios' }, { status: 400 });
         }
 
         const credential = await prisma.credential.create({
             data: {
-                product_id,
+                product_id: product_id || null,
                 variation_id: variation_id || null,
                 email,
                 password,

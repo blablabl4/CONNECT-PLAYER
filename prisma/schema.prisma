@@ -50,7 +50,7 @@ model ProductVariation {
 
 model Credential {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  product_id     String            @db.Uuid
+  product_id     String?           @db.Uuid
   variation_id   String?           @db.Uuid
   email          String
   password       String
@@ -58,7 +58,7 @@ model Credential {
   assigned_to    String?           @db.Uuid
   created_at     DateTime          @default(now()) @db.Timestamptz
 
-  product        Product           @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  product        Product?          @relation(fields: [product_id], references: [id], onDelete: Cascade)
   variation      ProductVariation? @relation(fields: [variation_id], references: [id], onDelete: SetNull)
   orders         Order[]
 
