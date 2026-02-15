@@ -147,6 +147,30 @@ export async function GET() {
             results.push('Created table: affiliate_visits');
         }
 
+        // ========== SCHEMA EVOLUTION MIGRATIONS ==========
+        // These ALTER statements safely update existing tables to match the latest schema.
+
+        // Credentials table: make email/password/product_id optional, add link column
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ALTER COLUMN email DROP NOT NULL`);
+            results.push('Altered credentials: email now nullable');
+        } catch { results.push('credentials.email already nullable'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ALTER COLUMN password DROP NOT NULL`);
+            results.push('Altered credentials: password now nullable');
+        } catch { results.push('credentials.password already nullable'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ALTER COLUMN product_id DROP NOT NULL`);
+            results.push('Altered credentials: product_id now nullable');
+        } catch { results.push('credentials.product_id already nullable'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ADD COLUMN IF NOT EXISTS link TEXT`);
+            results.push('Added credentials.link column');
+        } catch { results.push('credentials.link column already exists'); }
+
         if (results.length === 1) {
             results.push('All tables already exist!');
         }
