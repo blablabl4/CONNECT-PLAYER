@@ -52,8 +52,9 @@ model Credential {
   id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   product_id     String?           @db.Uuid
   variation_id   String?           @db.Uuid
-  email          String
-  password       String
+  email          String?
+  password       String?
+  link           String?
   is_used        Boolean           @default(false)
   assigned_to    String?           @db.Uuid
   created_at     DateTime          @default(now()) @db.Timestamptz

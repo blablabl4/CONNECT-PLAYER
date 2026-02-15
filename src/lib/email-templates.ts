@@ -5,14 +5,19 @@ export function credentialDeliveryEmail({
     productName,
     credentialEmail,
     credentialPassword,
+    credentialLink,
     variationName,
 }: {
     customerName: string;
     productName: string;
-    credentialEmail: string;
-    credentialPassword: string;
+    credentialEmail?: string;
+    credentialPassword?: string;
+    credentialLink?: string;
     variationName?: string;
 }) {
+    const hasEmailPassword = credentialEmail && credentialPassword;
+    const hasLink = credentialLink;
+
     return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -53,6 +58,7 @@ export function credentialDeliveryEmail({
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#1a1a1a;border-radius:12px;border:1px solid #333;overflow:hidden;">
                                 <tr>
                                     <td style="padding:24px;">
+                                        ${hasEmailPassword ? `
                                         <p style="margin:0 0 4px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">
                                             Email / Login
                                         </p>
@@ -65,6 +71,17 @@ export function credentialDeliveryEmail({
                                         <p style="margin:0;color:#d4a04a;font-size:18px;font-weight:700;letter-spacing:0.5px;">
                                             ${credentialPassword}
                                         </p>
+                                        ` : ''}
+                                        ${hasLink ? `
+                                        <p style="margin:0 0 8px;color:#888;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">
+                                            Link de Acesso
+                                        </p>
+                                        <p style="margin:0;">
+                                            <a href="${credentialLink}" style="color:#d4a04a;font-size:14px;word-break:break-all;text-decoration:underline;">
+                                                ${credentialLink}
+                                            </a>
+                                        </p>
+                                        ` : ''}
                                     </td>
                                 </tr>
                             </table>

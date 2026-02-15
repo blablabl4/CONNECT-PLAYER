@@ -18,7 +18,8 @@ export default function AdminCredentialsPage() {
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [bulkText, setBulkText] = useState('');
-    const [newCred, setNewCred] = useState({ email: '', password: '' });
+    const [credType, setCredType] = useState<'email' | 'link'>('email');
+    const [newCred, setNewCred] = useState({ email: '', password: '', link: '' });
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
@@ -54,17 +55,19 @@ export default function AdminCredentialsPage() {
     const handleAddSingle = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            const payload = credType === 'email'
+                ? { email: newCred.email, password: newCred.password }
+                : { link: newCred.link };
+
             await fetch('/api/admin/credentials', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: newCred.email,
-                    password: newCred.password,
-                }),
+                body: JSON.stringify(payload),
             });
         } catch { /* ignore */ }
         setShowModal(false);
-        setNewCred({ email: '', password: '' });
+        setCredType('email');
+        setNewCred({ email: '', password: '', link: '' });
         fetchData();
     };
 
@@ -160,6 +163,7 @@ export default function AdminCredentialsPage() {
                                 <th>Produto (Variação)</th>
                                 <th>E-mail</th>
                                 <th>Senha</th>
+                                <th>Link</th>
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -168,8 +172,15 @@ export default function AdminCredentialsPage() {
                             {filteredCreds.map(cred => (
                                 <tr key={cred.id}>
                                     <td>{cred.product_name}</td>
-                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{cred.email}</td>
-                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{cred.password}</td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{cred.email || '-'}</td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{cred.password || '-'}</td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.75rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {cred.link ? (
+                                            <a href={cred.link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>
+                                                {cred.link}
+                                            </a>
+                                        ) : '-'}
+                                    </td>
                                     <td>
                                         <span className={`badge ${cred.is_used ? 'badge-danger' : 'badge-success'}`}>
                                             {cred.is_used ? 'Usada' : 'Disponível'}
@@ -198,13 +209,49 @@ export default function AdminCredentialsPage() {
                             </div>
                             <form onSubmit={handleAddSingle}>
                                 <div className="form-group">
-                                    <label className="form-label">E-mail / Login *</label>
-                                    <input type="text" className="form-input" required placeholder="usuario@exemplo.com" value={newCred.email} onChange={e => setNewCred(prev => ({ ...prev, email: e.target.value }))} />
+                                    <label className="form-label">Tipo de Credencial</label>
+                                    <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="credType"
+                                                value="email"
+                                                checked={credType === 'email'}
+                                                onChange={() => setCredType('email')}
+                                            />
+                                            <span>Email + Senha</span>
+                                        </label>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name="credType"
+                                                value="link"
+                                                checked={credType === 'link'}
+                                                onChange={() => setCredType('link')}
+                                            />
+                                            <span>Link</span>
+                                        </label>
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label className="form-label">Senha *</label>
-                                    <input type="text" className="form-input" required placeholder="senha123" value={newCred.password} onChange={e => setNewCred(prev => ({ ...prev, password: e.target.value }))} />
-                                </div>
+
+                                {credType === 'email' ? (
+                                    <>
+                                        <div className="form-group">
+                                            <label className="form-label">E-mail / Login *</label>
+                                            <input type="text" className="form-input" required placeholder="usuario@exemplo.com" value={newCred.email} onChange={e => setNewCred(prev => ({ ...prev, email: e.target.value }))} />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-label">Senha *</label>
+                                            <input type="text" className="form-input" required placeholder="senha123" value={newCred.password} onChange={e => setNewCred(prev => ({ ...prev, password: e.target.value }))} />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="form-group">
+                                        <label className="form-label">Link da Credencial *</label>
+                                        <input type="text" className="form-input" required placeholder="https://..." value={newCred.link} onChange={e => setNewCred(prev => ({ ...prev, link: e.target.value }))} />
+                                    </div>
+                                )}
+
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                                     <button type="submit" className="btn btn-primary">Adicionar</button>

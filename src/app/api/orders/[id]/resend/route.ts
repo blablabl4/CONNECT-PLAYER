@@ -39,8 +39,9 @@ export async function POST(
             html: credentialDeliveryEmail({
                 customerName: order.customer_name,
                 productName: order.product?.name || 'Produto',
-                credentialEmail: order.credential.email,
-                credentialPassword: order.credential.password,
+                credentialEmail: order.credential.email || undefined,
+                credentialPassword: order.credential.password || undefined,
+                credentialLink: order.credential.link || undefined,
                 variationName: order.variation_name || undefined,
             }),
         });

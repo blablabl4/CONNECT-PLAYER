@@ -54,8 +54,9 @@ export interface Credential {
     id: string;
     product_id?: string | null;
     variation_id?: string | null;
-    email: string;
-    password: string;
+    email?: string | null;
+    password?: string | null;
+    link?: string | null;
     is_used: boolean;
     assigned_to?: string | null;
     created_at: string;

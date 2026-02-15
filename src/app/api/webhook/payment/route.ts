@@ -100,8 +100,9 @@ export async function POST(request: NextRequest) {
                         html: credentialDeliveryEmail({
                             customerName: order.customer_name,
                             productName: order.product?.name || 'Produto',
-                            credentialEmail: credential.email,
-                            credentialPassword: credential.password,
+                            credentialEmail: credential.email || undefined,
+                            credentialPassword: credential.password || undefined,
+                            credentialLink: credential.link || undefined,
                             variationName: order.variation_name || undefined,
                         }),
                     });

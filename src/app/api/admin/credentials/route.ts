@@ -26,18 +26,25 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { product_id, variation_id, email, password } = body;
+        const { product_id, variation_id, email, password, link } = body;
 
-        if (!email || !password) {
-            return NextResponse.json({ error: 'email e password obrigatórios' }, { status: 400 });
+        // Validate: must have either (email AND password) OR link
+        const hasEmailPassword = email && password;
+        const hasLink = link;
+
+        if (!hasEmailPassword && !hasLink) {
+            return NextResponse.json({
+                error: 'Forneça email+senha OU link da credencial'
+            }, { status: 400 });
         }
 
         const credential = await prisma.credential.create({
             data: {
                 product_id: product_id || null,
                 variation_id: variation_id || null,
-                email,
-                password,
+                email: email || null,
+                password: password || null,
+                link: link || null,
             },
             include: { product: true, variation: true },
         });
