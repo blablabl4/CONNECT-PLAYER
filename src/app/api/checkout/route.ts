@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
         const variationName = body.variation_name || body.variationName;
         const quantity = Math.max(1, parseInt(body.quantity || '1', 10));
 
-        if (!productId || !email || !name) {
+        if (!productId || !email || !name || !variationId) {
             return NextResponse.json(
-                { error: 'Dados incompletos: Nome, Email e Produto são obrigatórios.' },
+                { error: 'Dados incompletos: Nome, Email, Produto e Variação são obrigatórios.' },
                 { status: 400 }
             );
         }
@@ -35,32 +35,23 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Determine unit price (use variation price if applicable)
-        let unitPrice = Number(product.price);
-        let itemName = product.name;
-        if (variationId) {
-            const variation = product.variations.find((v: any) => v.id === variationId);
-            if (variation) {
-                unitPrice = Number(variation.price);
-                itemName = `${product.name} - ${variation.name}`;
-            }
+        // Determine unit price from the selected variation
+        const variation = product.variations.find((v: any) => v.id === variationId);
+        if (!variation) {
+            return NextResponse.json(
+                { error: 'Variação não encontrada' },
+                { status: 404 }
+            );
         }
+        const unitPrice = Number(variation.price);
+        const itemName = `${product.name} - ${variation.name}`;
 
         // Check stock (available credential slots) — supports multi-use credentials
-        let stockResult: any[];
-        if (variationId) {
-            stockResult = await prisma.$queryRaw`
-                SELECT COALESCE(SUM(max_uses - current_uses), 0) as available
-                FROM credentials
-                WHERE product_id = ${product.id}::uuid AND is_used = false AND variation_id = ${variationId}::uuid
-            `;
-        } else {
-            stockResult = await prisma.$queryRaw`
-                SELECT COALESCE(SUM(max_uses - current_uses), 0) as available
-                FROM credentials
-                WHERE product_id = ${product.id}::uuid AND is_used = false AND variation_id IS NULL
-            `;
-        }
+        const stockResult: any[] = await prisma.$queryRaw`
+            SELECT COALESCE(SUM(max_uses - current_uses), 0) as available
+            FROM credentials
+            WHERE product_id = ${product.id}::uuid AND is_used = false AND variation_id = ${variationId}::uuid
+        `;
         const availableCredentials = Number(stockResult[0]?.available || 0);
 
         if (availableCredentials < quantity) {

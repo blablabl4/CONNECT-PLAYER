@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { Product, ProductVariation, Credential } from '@/lib/types';
+import { Product, ProductVariation } from '@/lib/types';
 
 const EMPTY_PRODUCT: Partial<Product> = {
     name: '', description: '', price: 0, image_url: '',
@@ -14,14 +14,12 @@ const EMPTY_PRODUCT: Partial<Product> = {
 export default function AdminProductsPage() {
     const router = useRouter();
     const [products, setProducts] = useState<Product[]>([]);
-    const [credentials, setCredentials] = useState<Credential[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<Partial<Product>>(EMPTY_PRODUCT);
     const [variations, setVariations] = useState<Partial<ProductVariation>[]>([]);
     const [featuresText, setFeaturesText] = useState('');
     const [loading, setLoading] = useState(false);
-    const [hasVariations, setHasVariations] = useState(false);
     const [categories, setCategories] = useState<{ icon: string; name: string; color: string }[]>([]);
 
     useEffect(() => {
@@ -47,17 +45,15 @@ export default function AdminProductsPage() {
         setProducts([]);
     }
 
-    const openNewProduct = async () => {
+    const openNewProduct = () => {
         setEditingProduct(null);
         setFormData(EMPTY_PRODUCT);
-        setVariations([]);
+        setVariations([{ name: '', price: 0, duration: '30 dias' }]);
         setFeaturesText('');
-        setHasVariations(false);
-        await fetchAvailableCredentials();
         setShowModal(true);
     };
 
-    const openEditProduct = async (product: Product) => {
+    const openEditProduct = (product: Product) => {
         setEditingProduct(product);
         setFormData({
             name: product.name,
@@ -72,30 +68,14 @@ export default function AdminProductsPage() {
         });
 
         const existingVars = product.variations || [];
-        setVariations(existingVars);
-        setHasVariations(existingVars.length > 0);
+        setVariations(existingVars.length > 0 ? existingVars : [{ name: product.name, price: product.price, duration: product.duration }]);
         setFeaturesText((product.features || []).join('\n'));
-        await fetchAvailableCredentials();
         setShowModal(true);
     };
 
-    async function fetchAvailableCredentials() {
-        try {
-            const res = await fetch('/api/admin/credentials');
-            if (res.ok) {
-                const allCreds = await res.json();
-                // Show only unused credentials (or currently linked to this product's variations)
-                const available = allCreds.filter((c: Credential) => !c.is_used || !c.product_id);
-                setCredentials(available);
-            }
-        } catch {
-            setCredentials([]);
-        }
-    }
-
     const handleAddVariation = () => {
         setVariations([...variations, {
-            name: '', price: 0, stock: 0, duration: formData.duration || '30 dias'
+            name: '', price: 0, duration: formData.duration || '30 dias'
         }]);
     };
 
@@ -106,6 +86,10 @@ export default function AdminProductsPage() {
     };
 
     const removeVariation = (index: number) => {
+        if (variations.length <= 1) {
+            alert('O produto deve ter pelo menos 1 variação.');
+            return;
+        }
         setVariations(variations.filter((_, i) => i !== index));
     };
 
@@ -133,19 +117,21 @@ export default function AdminProductsPage() {
         e.preventDefault();
         setLoading(true);
 
-        // If has variations, base price is min price of variations, stock is sum
-        let finalPrice = formData.price;
-        let finalStock = formData.stock;
-
-        if (hasVariations && variations.length > 0) {
-            finalPrice = Math.min(...variations.map(v => v.price || 0));
-            finalStock = variations.reduce((sum, v) => sum + (v.stock || 0), 0);
+        // Validate: at least 1 variation with name and price
+        const validVariations = variations.filter(v => v.name && v.price !== undefined && v.price !== null);
+        if (validVariations.length === 0) {
+            alert('Adicione pelo menos 1 variação com nome e preço.');
+            setLoading(false);
+            return;
         }
+
+        // Base price = min price of variations
+        const finalPrice = Math.min(...validVariations.map(v => v.price || 0));
 
         const productData = {
             ...formData,
             price: finalPrice,
-            stock: finalStock,
+            stock: 0, // Stock comes from credentials, not manual input
             features: featuresText.split('\n').filter(f => f.trim()),
         };
 
@@ -153,7 +139,7 @@ export default function AdminProductsPage() {
             const payload = {
                 ...productData,
                 ...(editingProduct ? { id: editingProduct.id } : {}),
-                ...(hasVariations ? { variations } : { variations: [] }),
+                variations: validVariations,
             };
 
             const res = await fetch('/api/admin/products', {
@@ -219,13 +205,17 @@ export default function AdminProductsPage() {
                                 <tr key={product.id}>
                                     <td>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                            <div style={{
-                                                width: '40px', height: '40px', borderRadius: 'var(--radius-sm)',
-                                                background: 'var(--bg-secondary)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
-                                            }}>
-                                                {product.category === 'Música' ? '🎵' : product.category === 'IPTV' ? '📺' : '🎬'}
-                                            </div>
+                                            {product.image_url ? (
+                                                <img src={product.image_url} alt="" style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-sm)', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{
+                                                    width: '40px', height: '40px', borderRadius: 'var(--radius-sm)',
+                                                    background: 'var(--bg-secondary)',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem',
+                                                }}>
+                                                    🏷️
+                                                </div>
+                                            )}
                                             <div>
                                                 <div style={{ fontWeight: 600 }}>{product.name}</div>
                                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{product.description?.substring(0, 40)}...</div>
@@ -242,14 +232,17 @@ export default function AdminProductsPage() {
                                     </td>
                                     <td>
                                         {product.variations && product.variations.length > 0 ? (
-                                            // Sum stock
-                                            product.variations.reduce((acc, v) => acc + (v.stock || 0), 0)
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {product.variations.map((v) => (
+                                                    <span key={v.id} style={{ fontSize: '0.8rem' }}>
+                                                        {v.name}: <strong style={{ color: (v.stock || 0) > 0 ? 'var(--success)' : 'var(--danger)' }}>{v.stock || 0}</strong>
+                                                    </span>
+                                                ))}
+                                            </div>
                                         ) : product.stock}
                                     </td>
                                     <td>
-                                        {product.variations && product.variations.length > 0 ? (
-                                            <span className="badge badge-gold">{product.variations.length} opções</span>
-                                        ) : '-'}
+                                        <span className="badge badge-gold">{(product.variations || []).length} opções</span>
                                     </td>
                                     <td>
                                         <span className={`badge ${product.is_active ? 'badge-success' : 'badge-danger'}`}>
@@ -282,7 +275,10 @@ export default function AdminProductsPage() {
                                 {/* Basic Info */}
                                 <div className="form-group">
                                     <label className="form-label">Nome do Produto *</label>
-                                    <input type="text" className="form-input" required value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="Ex: Netflix Premium" />
+                                    <input type="text" className="form-input" required value={formData.name} onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="Ex: ChatGPT, Netflix, Spotify" />
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        Este é o agrupamento visual que o cliente verá. As opções de compra são as variações abaixo.
+                                    </p>
                                 </div>
                                 <div className="form-group">
                                     <label className="form-label">Categoria *</label>
@@ -299,120 +295,63 @@ export default function AdminProductsPage() {
                                     <textarea className="form-input" rows={3} placeholder="Descreva o produto, seus benefícios, detalhes..." value={formData.description} onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} style={{ resize: 'vertical', minHeight: '80px' }} />
                                 </div>
 
-                                {/* Variations Toggle */}
+                                {/* Variations — always visible, required */}
                                 <div style={{ marginBottom: '20px', padding: '16px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <label style={{ fontWeight: 600 }}>Este produto possui variações?</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <input type="checkbox" id="has_vars" checked={hasVariations} onChange={e => setHasVariations(e.target.checked)} style={{ width: '18px', height: '18px' }} />
-                                            <label htmlFor="has_vars">Sim, adicionar variações</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <div>
+                                            <label style={{ fontWeight: 600 }}>Variações do Produto *</label>
+                                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                                Cada variação é uma opção de compra. Ex: "Privado R$15,90" e "Compartilhado R$6,99". O estoque é controlado pelas credenciais.
+                                            </p>
                                         </div>
+                                        <button type="button" className="btn btn-sm btn-secondary" onClick={handleAddVariation}>+ Adicionar</button>
                                     </div>
-                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                        Ex: (1 Tela, 4 Telas), (Mensal, Anual), etc.
-                                    </p>
-                                </div>
-
-                                {!hasVariations ? (
-                                    /* SINGLE PRODUCT FIELDS */
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                                        <div className="form-group">
-                                            <label className="form-label">Preço (R$) *</label>
-                                            <input type="number" step="0.01" className="form-input" required={!hasVariations} value={formData.price} onChange={e => setFormData(p => ({ ...p, price: parseFloat(e.target.value) }))} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Estoque</label>
-                                            <input type="number" className="form-input" value={formData.stock} onChange={e => setFormData(p => ({ ...p, stock: parseInt(e.target.value) }))} />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-label">Duração</label>
-                                            <select className="form-input" value={formData.duration} onChange={e => setFormData(p => ({ ...p, duration: e.target.value }))}>
-                                                <option value="30 dias">30 dias</option>
-                                                <option value="60 dias">60 dias</option>
-                                                <option value="90 dias">90 dias</option>
-                                                <option value="Vitalício">Vitalício</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    /* VARIATIONS MANAGER */
-                                    <div className="form-group">
-                                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Variações do Produto</span>
-                                            <button type="button" className="btn btn-sm btn-secondary" onClick={handleAddVariation}>+ Adicionar Opção</button>
-                                        </label>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                                            {variations.map((v, idx) => (
-                                                <div key={idx} style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                                    {/* Header: title + delete */}
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Variação {idx + 1}</span>
-                                                        <button type="button" onClick={() => removeVariation(idx)} className="btn" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.9rem' }} title="Remover opção">
-                                                            🗑️
-                                                        </button>
-                                                    </div>
-                                                    {/* Name */}
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {variations.map((v, idx) => (
+                                            <div key={idx} style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                {/* Header: title + delete */}
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>Variação {idx + 1}</span>
+                                                    <button type="button" onClick={() => removeVariation(idx)} className="btn" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', height: '32px', width: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', fontSize: '0.9rem' }} title="Remover opção">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                                {/* Name */}
+                                                <div>
+                                                    <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome (Ex: Privado, Compartilhado, Mensal) *</label>
+                                                    <input type="text" className="form-input" placeholder="Nome da variação" value={v.name} onChange={e => handleVariationChange(idx, 'name', e.target.value)} required />
+                                                </div>
+                                                {/* Description */}
+                                                <div>
+                                                    <label className="form-label" style={{ fontSize: '0.85rem' }}>Descrição</label>
+                                                    <textarea className="form-input" rows={2} placeholder="Descrição específica desta variação..." value={v.description || ''} onChange={e => handleVariationChange(idx, 'description', e.target.value)} style={{ resize: 'vertical', minHeight: '50px', fontSize: '0.85rem', width: '100%' }} />
+                                                </div>
+                                                {/* Price / Duration row — no stock field */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                                     <div>
-                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Nome (Ex: 1 Tela, Mensal)</label>
-                                                        <input type="text" className="form-input" placeholder="Nome da opção" value={v.name} onChange={e => handleVariationChange(idx, 'name', e.target.value)} required />
+                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$) *</label>
+                                                        <input type="number" step="0.01" className="form-input" placeholder="0.00" value={v.price} onChange={e => handleVariationChange(idx, 'price', parseFloat(e.target.value))} required />
                                                     </div>
-                                                    {/* Description */}
                                                     <div>
-                                                        <label className="form-label" style={{ fontSize: '0.85rem' }}>Descrição</label>
-                                                        <textarea className="form-input" rows={2} placeholder="Descrição específica desta variação..." value={v.description || ''} onChange={e => handleVariationChange(idx, 'description', e.target.value)} style={{ resize: 'vertical', minHeight: '50px', fontSize: '0.85rem', width: '100%' }} />
-                                                    </div>
-                                                    {/* Price / Stock / Duration row */}
-                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                                                        <div>
-                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$)</label>
-                                                            <input type="number" step="0.01" className="form-input" placeholder="0.00" value={v.price} onChange={e => handleVariationChange(idx, 'price', parseFloat(e.target.value))} required />
-                                                        </div>
-                                                        <div>
-                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Estoque</label>
-                                                            <input type="number" className="form-input" placeholder="0" value={v.stock || ''} onChange={e => handleVariationChange(idx, 'stock', parseInt(e.target.value) || 0)} />
-                                                        </div>
-                                                        <div>
-                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
-                                                            <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
-                                                                <option value="30 dias">30 dias</option>
-                                                                <option value="60 dias">60 dias</option>
-                                                                <option value="90 dias">90 dias</option>
-                                                                <option value="Vitalício">Vitalício</option>
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                    {/* Credential Selection */}
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Credencial (Opcional)</label>
-                                                        <select
-                                                            className="form-input"
-                                                            value={v.credential_id || ''}
-                                                            onChange={e => handleVariationChange(idx, 'credential_id', e.target.value || null)}
-                                                            style={{ fontSize: '0.85rem' }}
-                                                        >
-                                                            <option value="">Sem credencial vinculada</option>
-                                                            {credentials.map(c => (
-                                                                <option key={c.id} value={c.id}>
-                                                                    {c.email} {c.password ? `(${c.password.substring(0, 4)}...)` : ''}
-                                                                </option>
-                                                            ))}
+                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
+                                                        <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVariationChange(idx, 'duration', e.target.value)}>
+                                                            <option value="30 dias">30 dias</option>
+                                                            <option value="60 dias">60 dias</option>
+                                                            <option value="90 dias">90 dias</option>
+                                                            <option value="Vitalício">Vitalício</option>
                                                         </select>
-                                                        {v.credential_id && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                                ✓ Vinculada
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
-                                            ))}
-                                            {variations.length === 0 && (
-                                                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: '8px' }}>
-                                                    Nenhuma variação adicionada. Clique em "+ Adicionar Opção".
-                                                </div>
-                                            )}
-                                        </div>
+                                                {/* Stock indicator — read only, from credentials */}
+                                                {v.id && (
+                                                    <div style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                        📦 Estoque atual: <strong style={{ color: (v.stock || 0) > 0 ? 'var(--success)' : 'var(--danger)' }}>{v.stock || 0}</strong> (baseado nas credenciais vinculadas)
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
+                                </div>
 
                                 <div className="form-group" style={{ marginTop: '16px' }}>
                                     <label className="form-label">Imagem do Produto (máx. 2MB)</label>

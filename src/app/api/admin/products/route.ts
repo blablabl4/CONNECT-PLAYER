@@ -49,11 +49,19 @@ export async function GET() {
     }
 }
 
-// POST: Create product (with optional variations)
+// POST: Create product (requires at least 1 variation)
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { name, description, price, image_url, category, duration, is_active, stock, features, variations } = body;
+
+        // Validate: at least 1 variation required
+        if (!variations || !Array.isArray(variations) || variations.length === 0) {
+            return NextResponse.json(
+                { error: 'O produto precisa ter pelo menos 1 variação' },
+                { status: 400 }
+            );
+        }
 
         const product = await prisma.product.create({
             data: {
@@ -64,37 +72,21 @@ export async function POST(request: NextRequest) {
                 category: category || '',
                 duration: duration || '30 dias',
                 is_active: is_active !== false,
-                stock: stock || 0,
+                stock: 0, // Stock is always calculated from credentials
                 features: features || [],
-                variations: variations?.length ? {
-                    create: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string; stock?: number; credential_id?: string }) => ({
+                variations: {
+                    create: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string }) => ({
                         name: v.name,
                         description: v.description || null,
                         price: v.price,
                         original_price: v.original_price || null,
                         duration: v.duration || null,
-                        stock: v.stock || 0,
+                        stock: 0, // Stock comes from credentials
                     })),
-                } : undefined,
+                },
             },
             include: { variations: true },
         });
-
-        // Link credentials to variations if provided
-        if (variations?.length) {
-            for (let i = 0; i < variations.length; i++) {
-                const v = variations[i];
-                if (v.credential_id && product.variations[i]) {
-                    await prisma.credential.update({
-                        where: { id: v.credential_id },
-                        data: {
-                            product_id: product.id,
-                            variation_id: product.variations[i].id,
-                        },
-                    });
-                }
-            }
-        }
 
         return NextResponse.json({
             ...product,

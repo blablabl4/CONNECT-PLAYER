@@ -18,12 +18,17 @@ export default function AdminCredentialsPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+
+    // Single add state
+    const [credType, setCredType] = useState<'email' | 'link'>('email');
+    const [newCred, setNewCred] = useState({ product_id: '', variation_id: '', email: '', password: '', link: '', max_uses: 1 });
+
+    // Bulk add state
     const [selectedProduct, setSelectedProduct] = useState('');
     const [selectedVariation, setSelectedVariation] = useState('');
     const [bulkText, setBulkText] = useState('');
-    const [credType, setCredType] = useState<'email' | 'link'>('email');
-    const [newCred, setNewCred] = useState({ product_id: '', variation_id: '', email: '', password: '', link: '', max_uses: 1 });
     const [bulkMaxUses, setBulkMaxUses] = useState(1);
+
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
@@ -47,7 +52,7 @@ export default function AdminCredentialsPage() {
                 const creds = await credsRes.json();
                 setCredentials(creds.map((c: any) => ({
                     ...c,
-                    product_name: (c.product?.name || 'Não vinculado') + (c.variation?.name ? ` (${c.variation.name})` : ''),
+                    product_name: (c.product?.name || 'Não vinculado') + (c.variation?.name ? ` → ${c.variation.name}` : ''),
                 })));
                 return;
             }
@@ -62,16 +67,22 @@ export default function AdminCredentialsPage() {
         : filter === 'available' ? credentials.filter(c => !c.is_used)
             : credentials.filter(c => c.is_used);
 
-    // Get current product variations
+    // Get variations for selected product
     const currentProductInModal = products.find(p => p.id === newCred.product_id);
     const currentProductInBulk = products.find(p => p.id === selectedProduct);
 
     const handleAddSingle = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!newCred.product_id || !newCred.variation_id) {
+            alert('Selecione o produto e a variação.');
+            return;
+        }
+
         try {
             const payload: any = {
-                product_id: newCred.product_id || null,
-                variation_id: newCred.variation_id || null,
+                product_id: newCred.product_id,
+                variation_id: newCred.variation_id,
                 max_uses: newCred.max_uses || 1,
             };
 
@@ -96,12 +107,18 @@ export default function AdminCredentialsPage() {
 
     const handleBulkAdd = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!selectedProduct || !selectedVariation) {
+            alert('Selecione o produto e a variação.');
+            return;
+        }
+
         const lines = bulkText.split('\n').filter(l => l.trim());
         const creds = lines.map(line => {
             const [email, password] = line.split(/[;:,|]/).map(s => s.trim());
             return {
-                product_id: selectedProduct || null,
-                variation_id: selectedVariation || null,
+                product_id: selectedProduct,
+                variation_id: selectedVariation,
                 email,
                 password,
                 max_uses: bulkMaxUses || 1,
@@ -142,7 +159,7 @@ export default function AdminCredentialsPage() {
                     <div>
                         <h1 className="admin-title">Credenciais</h1>
                         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '4px' }}>
-                            Pool de contas para entrega automática
+                            Pool de contas para entrega automática — o estoque do produto é baseado nas credenciais.
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -166,7 +183,7 @@ export default function AdminCredentialsPage() {
                         <div className="stat-card-value" style={{ color: 'var(--success)' }}>{availableCount}</div>
                     </div>
                     <div className="stat-card">
-                        <div className="stat-card-label">Usadas</div>
+                        <div className="stat-card-label">Esgotadas</div>
                         <div className="stat-card-value" style={{ color: 'var(--text-muted)' }}>{usedCount}</div>
                     </div>
                 </div>
@@ -176,7 +193,7 @@ export default function AdminCredentialsPage() {
                     {[
                         { value: 'all', label: 'Todas' },
                         { value: 'available', label: 'Disponíveis' },
-                        { value: 'used', label: 'Usadas' },
+                        { value: 'used', label: 'Esgotadas' },
                     ].map(tab => (
                         <button
                             key={tab.value}
@@ -192,7 +209,7 @@ export default function AdminCredentialsPage() {
                     <table className="admin-table">
                         <thead>
                             <tr>
-                                <th>Produto (Variação)</th>
+                                <th>Produto → Variação</th>
                                 <th>E-mail</th>
                                 <th>Senha</th>
                                 <th>Link</th>
@@ -242,43 +259,41 @@ export default function AdminCredentialsPage() {
                                 <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                             </div>
                             <form onSubmit={handleAddSingle}>
+                                {/* Product + Variation Selection — REQUIRED */}
                                 <div className="form-group">
-                                    <label className="form-label">Produto</label>
-                                    <select className="form-input" value={newCred.product_id} onChange={e => setNewCred(prev => ({ ...prev, product_id: e.target.value, variation_id: '' }))}>
-                                        <option value="">Sem vínculo</option>
+                                    <label className="form-label">Produto *</label>
+                                    <select className="form-input" required value={newCred.product_id} onChange={e => setNewCred(prev => ({ ...prev, product_id: e.target.value, variation_id: '' }))}>
+                                        <option value="">Selecione o produto</option>
                                         {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                 </div>
                                 {currentProductInModal && currentProductInModal.variations && currentProductInModal.variations.length > 0 && (
                                     <div className="form-group">
-                                        <label className="form-label">Variação</label>
-                                        <select className="form-input" value={newCred.variation_id} onChange={e => setNewCred(prev => ({ ...prev, variation_id: e.target.value }))}>
-                                            <option value="">Selecione</option>
-                                            {currentProductInModal.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                        <label className="form-label">Variação *</label>
+                                        <select className="form-input" required value={newCred.variation_id} onChange={e => setNewCred(prev => ({ ...prev, variation_id: e.target.value }))}>
+                                            <option value="">Selecione a variação</option>
+                                            {currentProductInModal.variations.map(v => (
+                                                <option key={v.id} value={v.id}>
+                                                    {v.name} — R$ {v.price.toFixed(2)} (estoque: {v.stock || 0})
+                                                </option>
+                                            ))}
                                         </select>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                            A credencial será vinculada a essa variação. O estoque da variação atualiza automaticamente.
+                                        </p>
                                     </div>
                                 )}
+
+                                {/* Credential Type */}
                                 <div className="form-group">
                                     <label className="form-label">Tipo de Credencial</label>
                                     <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                            <input
-                                                type="radio"
-                                                name="credType"
-                                                value="email"
-                                                checked={credType === 'email'}
-                                                onChange={() => setCredType('email')}
-                                            />
+                                            <input type="radio" name="credType" value="email" checked={credType === 'email'} onChange={() => setCredType('email')} />
                                             <span>Email + Senha</span>
                                         </label>
                                         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                            <input
-                                                type="radio"
-                                                name="credType"
-                                                value="link"
-                                                checked={credType === 'link'}
-                                                onChange={() => setCredType('link')}
-                                            />
+                                            <input type="radio" name="credType" value="link" checked={credType === 'link'} onChange={() => setCredType('link')} />
                                             <span>Link</span>
                                         </label>
                                     </div>
@@ -305,7 +320,9 @@ export default function AdminCredentialsPage() {
                                 <div className="form-group">
                                     <label className="form-label">Máx. Usos</label>
                                     <input type="number" className="form-input" min={1} value={newCred.max_uses} onChange={e => setNewCred(prev => ({ ...prev, max_uses: parseInt(e.target.value) || 1 }))} />
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Quantas vezes essa credencial pode ser usada (ex: 4 para 4 telas)</p>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        1 = uso individual (1 venda). N = compartilhado (N vendas com a mesma credencial).
+                                    </p>
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -326,24 +343,30 @@ export default function AdminCredentialsPage() {
                                 <button className="modal-close" onClick={() => setShowBulkModal(false)}>✕</button>
                             </div>
                             <form onSubmit={handleBulkAdd}>
+                                {/* Product + Variation Selection — REQUIRED */}
                                 <div className="form-group">
-                                    <label className="form-label">Produto</label>
-                                    <select className="form-input" value={selectedProduct} onChange={e => { setSelectedProduct(e.target.value); setSelectedVariation(''); }}>
-                                        <option value="">Sem vínculo</option>
+                                    <label className="form-label">Produto *</label>
+                                    <select className="form-input" required value={selectedProduct} onChange={e => { setSelectedProduct(e.target.value); setSelectedVariation(''); }}>
+                                        <option value="">Selecione o produto</option>
                                         {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                     </select>
                                 </div>
                                 {currentProductInBulk && currentProductInBulk.variations && currentProductInBulk.variations.length > 0 && (
                                     <div className="form-group">
-                                        <label className="form-label">Variação</label>
-                                        <select className="form-input" value={selectedVariation} onChange={e => setSelectedVariation(e.target.value)}>
-                                            <option value="">Selecione</option>
-                                            {currentProductInBulk.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                        <label className="form-label">Variação *</label>
+                                        <select className="form-input" required value={selectedVariation} onChange={e => setSelectedVariation(e.target.value)}>
+                                            <option value="">Selecione a variação</option>
+                                            {currentProductInBulk.variations.map(v => (
+                                                <option key={v.id} value={v.id}>
+                                                    {v.name} — R$ {v.price.toFixed(2)} (estoque: {v.stock || 0})
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 )}
+
                                 <div className="form-group">
-                                    <label className="form-label">Credenciais (uma por linha, formato: email;senha)</label>
+                                    <label className="form-label">Credenciais (uma por linha, formato: email;senha) *</label>
                                     <textarea
                                         className="form-input" rows={8} required
                                         placeholder={"user1@email.com;senha123\nuser2@email.com;senha456\nuser3@email.com;senha789"}
@@ -355,7 +378,9 @@ export default function AdminCredentialsPage() {
                                 <div className="form-group">
                                     <label className="form-label">Máx. Usos (por credencial)</label>
                                     <input type="number" className="form-input" min={1} value={bulkMaxUses} onChange={e => setBulkMaxUses(parseInt(e.target.value) || 1)} />
-                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Quantas vezes cada credencial pode ser usada</p>
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                        1 = cada credencial é individual. N = cada credencial pode ser vendida N vezes.
+                                    </p>
                                 </div>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
                                     Separadores aceitos: ; : , |

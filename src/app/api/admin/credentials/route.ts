@@ -28,6 +28,13 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { product_id, variation_id, email, password, link, max_uses } = body;
 
+        // Validate: product and variation are required
+        if (!product_id || !variation_id) {
+            return NextResponse.json({
+                error: 'Produto e Variação são obrigatórios'
+            }, { status: 400 });
+        }
+
         // Validate: must have either (email AND password) OR link
         const hasEmailPassword = email && password;
         const hasLink = link;

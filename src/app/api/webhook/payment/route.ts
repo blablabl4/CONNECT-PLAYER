@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
             const credential = await prisma.credential.findFirst({
                 where: {
                     product_id: order.product_id,
-                    variation_id: order.variation_id || null,
+                    variation_id: order.variation_id,
                     is_used: false,
                 },
             });
