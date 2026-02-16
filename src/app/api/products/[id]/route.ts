@@ -18,33 +18,42 @@ export async function GET(
             return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });
         }
 
-        // Get credential counts for this product
-        const credentialCounts = await prisma.credential.groupBy({
-            by: ['variation_id'],
-            where: { product_id: id, is_used: false },
-            _count: { id: true },
-        });
+        // Get stock per credential group/subgroup
+        const credentialSlots: any[] = await prisma.$queryRaw`
+            SELECT "group", subgroup,
+                   SUM(max_uses - current_uses) as remaining
+            FROM credentials
+            WHERE is_used = false AND "group" != ''
+            GROUP BY "group", subgroup
+        `;
 
-        // Build stock map
-        let totalProductStock = 0;
-        const variationStockMap = new Map<string, number>();
-        for (const c of credentialCounts) {
-            totalProductStock += c._count.id;
-            if (c.variation_id) {
-                variationStockMap.set(c.variation_id, c._count.id);
-            }
+        const stockMap = new Map<string, number>();
+        for (const c of credentialSlots) {
+            const key = `${c.group}:${c.subgroup || ''}`;
+            stockMap.set(key, Number(c.remaining));
         }
+
+        let totalStock = 0;
+        const variations = product.variations.map((v: any) => {
+            let varStock = 0;
+            if (v.credential_group) {
+                const key = `${v.credential_group}:${v.credential_subgroup || ''}`;
+                varStock = stockMap.get(key) || 0;
+            }
+            totalStock += varStock;
+            return {
+                ...v,
+                price: Number(v.price),
+                original_price: v.original_price ? Number(v.original_price) : null,
+                stock: varStock,
+            };
+        });
 
         return NextResponse.json({
             ...product,
             price: Number(product.price),
-            stock: totalProductStock,
-            variations: product.variations.map((v: any) => ({
-                ...v,
-                price: Number(v.price),
-                original_price: v.original_price ? Number(v.original_price) : null,
-                stock: variationStockMap.get(v.id) || 0,
-            })),
+            stock: totalStock,
+            variations,
         });
     } catch {
         return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 });

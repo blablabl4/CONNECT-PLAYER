@@ -11,38 +11,47 @@ export async function GET() {
             orderBy: { created_at: 'desc' },
         });
 
-        // Get remaining uses for dynamic stock (supports multi-use credentials)
+        // Get stock per group/subgroup from credentials
         const credentialSlots: any[] = await prisma.$queryRaw`
-            SELECT product_id, variation_id, SUM(max_uses - current_uses) as remaining
+            SELECT "group", subgroup, 
+                   SUM(max_uses - current_uses) as remaining,
+                   COUNT(*) as total_creds
             FROM credentials
-            WHERE is_used = false
-            GROUP BY product_id, variation_id
+            WHERE is_used = false AND "group" != ''
+            GROUP BY "group", subgroup
         `;
 
         const stockMap = new Map<string, number>();
         for (const c of credentialSlots) {
-            // Skip credentials without product_id (unlinked credentials)
-            if (!c.product_id) continue;
-
-            const remaining = Number(c.remaining);
-            if (c.variation_id) {
-                stockMap.set(`${c.product_id}:${c.variation_id}`, remaining);
-            }
-            const current = stockMap.get(c.product_id) || 0;
-            stockMap.set(c.product_id, current + remaining);
+            const key = `${c.group}:${c.subgroup || ''}`;
+            stockMap.set(key, Number(c.remaining));
         }
 
-        return NextResponse.json(products.map((p: any) => ({
-            ...p,
-            price: Number(p.price),
-            stock: stockMap.get(p.id) || 0,
-            variations: p.variations.map((v: any) => ({
-                ...v,
-                price: Number(v.price),
-                original_price: v.original_price ? Number(v.original_price) : null,
-                stock: stockMap.get(`${p.id}:${v.id}`) || 0,
-            })),
-        })));
+        return NextResponse.json(products.map((p: any) => {
+            let totalStock = 0;
+            const vars = p.variations.map((v: any) => {
+                // Calculate stock based on credential group/subgroup and max_uses_per_credential
+                let varStock = 0;
+                if (v.credential_group) {
+                    const key = `${v.credential_group}:${v.credential_subgroup || ''}`;
+                    const rawRemaining = stockMap.get(key) || 0;
+                    varStock = rawRemaining;
+                }
+                totalStock += varStock;
+                return {
+                    ...v,
+                    price: Number(v.price),
+                    original_price: v.original_price ? Number(v.original_price) : null,
+                    stock: varStock,
+                };
+            });
+            return {
+                ...p,
+                price: Number(p.price),
+                stock: totalStock,
+                variations: vars,
+            };
+        }));
     } catch (error) {
         console.error('Admin products GET error:', error);
         return NextResponse.json({ error: 'Erro ao buscar produtos' }, { status: 500 });
@@ -53,14 +62,10 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { name, description, price, image_url, category, duration, is_active, stock, features, variations } = body;
+        const { name, description, price, image_url, category, duration, is_active, features, variations } = body;
 
-        // Validate: at least 1 variation required
         if (!variations || !Array.isArray(variations) || variations.length === 0) {
-            return NextResponse.json(
-                { error: 'O produto precisa ter pelo menos 1 variação' },
-                { status: 400 }
-            );
+            return NextResponse.json({ error: 'O produto precisa ter pelo menos 1 variação' }, { status: 400 });
         }
 
         const product = await prisma.product.create({
@@ -72,16 +77,19 @@ export async function POST(request: NextRequest) {
                 category: category || '',
                 duration: duration || '30 dias',
                 is_active: is_active !== false,
-                stock: 0, // Stock is always calculated from credentials
+                stock: 0,
                 features: features || [],
                 variations: {
-                    create: variations.map((v: { name: string; description?: string; price: number; original_price?: number; duration?: string }) => ({
+                    create: variations.map((v: any) => ({
                         name: v.name,
                         description: v.description || null,
                         price: v.price,
                         original_price: v.original_price || null,
                         duration: v.duration || null,
-                        stock: 0, // Stock comes from credentials
+                        stock: 0,
+                        credential_group: v.credential_group || null,
+                        credential_subgroup: v.credential_subgroup || null,
+                        max_uses_per_credential: v.max_uses_per_credential || 1,
                     })),
                 },
             },
@@ -113,22 +121,17 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
         }
 
-        // Update product fields
         const product = await prisma.product.update({
             where: { id },
-            data: {
-                ...data,
-                price: data.price !== undefined ? data.price : undefined,
-            },
+            data: { ...data, price: data.price !== undefined ? data.price : undefined },
             include: { variations: true },
         });
 
-        // Handle variations update if provided
         if (variations !== undefined) {
             const existingVariations = product.variations;
             const incomingIds = variations.filter((v: any) => v.id).map((v: any) => v.id);
 
-            // Delete variations that are no longer in the list
+            // Delete removed variations
             const toDelete = existingVariations.filter((ev: any) => !incomingIds.includes(ev.id));
             for (const del of toDelete) {
                 await prisma.productVariation.delete({ where: { id: del.id } });
@@ -136,70 +139,35 @@ export async function PUT(request: NextRequest) {
 
             // Upsert each variation
             for (const v of variations) {
+                const varData = {
+                    name: v.name,
+                    description: v.description || null,
+                    price: v.price,
+                    original_price: v.original_price || null,
+                    duration: v.duration || null,
+                    stock: 0,
+                    credential_group: v.credential_group || null,
+                    credential_subgroup: v.credential_subgroup || null,
+                    max_uses_per_credential: v.max_uses_per_credential || 1,
+                };
+
                 if (v.id && existingVariations.some((ev: any) => ev.id === v.id)) {
-                    // Update existing — preserves credential FK
-                    await prisma.productVariation.update({
-                        where: { id: v.id },
-                        data: {
-                            name: v.name,
-                            description: v.description || null,
-                            price: v.price,
-                            original_price: v.original_price || null,
-                            duration: v.duration || null,
-                            stock: v.stock !== undefined && v.stock !== null ? v.stock : 0,
-                        },
-                    });
-
-                    // Link credential if provided
-                    if (v.credential_id) {
-                        await prisma.credential.update({
-                            where: { id: v.credential_id },
-                            data: {
-                                product_id: id,
-                                variation_id: v.id,
-                            },
-                        });
-                    }
+                    await prisma.productVariation.update({ where: { id: v.id }, data: varData });
                 } else {
-                    // Create new variation
-                    const newVariation = await prisma.productVariation.create({
-                        data: {
-                            product_id: id,
-                            name: v.name,
-                            description: v.description || null,
-                            price: v.price,
-                            original_price: v.original_price || null,
-                            duration: v.duration || null,
-                            stock: v.stock || 0,
-                        },
-                    });
-
-                    // Link credential if provided
-                    if (v.credential_id) {
-                        await prisma.credential.update({
-                            where: { id: v.credential_id },
-                            data: {
-                                product_id: id,
-                                variation_id: newVariation.id,
-                            },
-                        });
-                    }
+                    await prisma.productVariation.create({ data: { product_id: id, ...varData } });
                 }
             }
         }
 
-        // Re-fetch with variations
         const updated = await prisma.product.findUnique({
             where: { id },
             include: { variations: true },
         });
 
         return NextResponse.json({
-            ...updated,
-            price: Number(updated!.price),
+            ...updated, price: Number(updated!.price),
             variations: updated!.variations.map((v: any) => ({
-                ...v,
-                price: Number(v.price),
+                ...v, price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
             })),
         });
@@ -214,11 +182,7 @@ export async function DELETE(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-
-        if (!id) {
-            return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
-        }
-
+        if (!id) return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
         await prisma.product.delete({ where: { id } });
         return NextResponse.json({ success: true });
     } catch (error) {

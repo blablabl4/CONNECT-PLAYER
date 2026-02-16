@@ -11,85 +11,74 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         console.log('Webhook received:', JSON.stringify(body));
 
-        // Mercado Pago sends: { action: "payment.updated", data: { id: "123456" } }
-        // or via query params: ?type=payment&data.id=123456
         let paymentMpId: string | null = null;
+        if (body.data?.id) paymentMpId = String(body.data.id);
+        else if (body.payment_id) paymentMpId = String(body.payment_id);
 
-        if (body.data?.id) {
-            paymentMpId = String(body.data.id);
-        } else if (body.payment_id) {
-            // Legacy/direct format
-            paymentMpId = String(body.payment_id);
-        }
+        if (!paymentMpId) return NextResponse.json({ received: true });
 
-        if (!paymentMpId) {
-            // Might be a test notification or irrelevant event
-            return NextResponse.json({ received: true });
-        }
-
-        // Fetch payment details from Mercado Pago
         let mpPaymentData: any;
-        try {
-            mpPaymentData = await mpPayment.get({ id: paymentMpId });
-        } catch (mpError) {
-            console.error('Error fetching payment from MP:', mpError);
-            return NextResponse.json({ error: 'Pagamento não encontrado no MP' }, { status: 404 });
-        }
+        try { mpPaymentData = await mpPayment.get({ id: paymentMpId }); }
+        catch (mpError) { console.error('Error fetching payment from MP:', mpError); return NextResponse.json({ error: 'Pagamento não encontrado no MP' }, { status: 404 }); }
 
-        const mpStatus = mpPaymentData.status; // approved, pending, rejected, cancelled, etc.
-        const externalReference = mpPaymentData.external_reference; // This is the order ID
+        const mpStatus = mpPaymentData.status;
+        const externalReference = mpPaymentData.external_reference;
+        if (!externalReference) return NextResponse.json({ received: true });
 
-        if (!externalReference) {
-            console.log('No external_reference, skipping');
-            return NextResponse.json({ received: true });
-        }
-
-        // Find order by ID (external_reference is the order ID)
         const order = await prisma.order.findUnique({
             where: { id: externalReference },
-            include: { product: true },
+            include: { product: true, variation: true },
         });
 
-        if (!order) {
-            console.error('Order not found:', externalReference);
-            return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
-        }
+        if (!order) { console.error('Order not found:', externalReference); return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 }); }
+        if (order.status === 'delivered') return NextResponse.json({ success: true, message: 'Already delivered' });
 
-        // Skip if already delivered
-        if (order.status === 'delivered') {
-            return NextResponse.json({ success: true, message: 'Already delivered' });
-        }
-
-        // Update payment_id on the order if not set
         if (!order.payment_id || order.payment_id === '') {
-            await prisma.order.update({
-                where: { id: order.id },
-                data: { payment_id: paymentMpId },
-            });
+            await prisma.order.update({ where: { id: order.id }, data: { payment_id: paymentMpId } });
         }
 
         if (mpStatus === 'approved') {
-            // Find an available credential — strictly match variation, supports multi-use
-            const credential = await prisma.credential.findFirst({
-                where: {
-                    product_id: order.product_id,
-                    variation_id: order.variation_id,
-                    is_used: false,
-                },
-            });
+            // Get credential group/subgroup and max_uses from the variation
+            const variation = order.variation as any;
+            const credGroup = variation?.credential_group || '';
+            const credSubgroup = variation?.credential_subgroup || null;
+            const maxUsesPerCred = variation?.max_uses_per_credential || 1;
+
+            // Find an available credential from the pool by group/subgroup
+            let credential: any;
+            if (credSubgroup) {
+                credential = await prisma.credential.findFirst({
+                    where: {
+                        group: credGroup,
+                        subgroup: credSubgroup,
+                        is_used: false,
+                        current_uses: { lt: maxUsesPerCred },
+                    },
+                });
+            } else if (credGroup) {
+                credential = await prisma.credential.findFirst({
+                    where: {
+                        group: credGroup,
+                        is_used: false,
+                        current_uses: { lt: maxUsesPerCred },
+                    },
+                });
+            }
 
             if (credential) {
                 const newUses = credential.current_uses + 1;
-                const fullyUsed = newUses >= credential.max_uses;
+                const fullyUsed = newUses >= maxUsesPerCred;
 
-                // Increment usage and assign to order
                 await prisma.$transaction([
                     prisma.credential.update({
                         where: { id: credential.id },
                         data: {
                             current_uses: newUses,
+                            max_uses: maxUsesPerCred,
                             is_used: fullyUsed,
                             assigned_to: order.id,
+                            product_id: order.product_id,
+                            variation_id: order.variation_id,
                         },
                     }),
                     prisma.order.update({
@@ -141,7 +130,6 @@ export async function POST(request: NextRequest) {
                 data: { status: 'cancelled' },
             });
         }
-        // For 'pending', 'in_process', etc. — do nothing, keep waiting
 
         return NextResponse.json({ success: true, mp_status: mpStatus });
     } catch (error) {
@@ -150,7 +138,6 @@ export async function POST(request: NextRequest) {
     }
 }
 
-// Mercado Pago may also send GET requests for verification
 export async function GET() {
     return NextResponse.json({ status: 'ok', webhook: 'active' });
 }

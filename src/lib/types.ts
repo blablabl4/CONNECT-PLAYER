@@ -11,6 +11,9 @@ export interface ProductVariation {
     badge?: string;
     duration: string | null;
     stock: number;
+    credential_group?: string | null;
+    credential_subgroup?: string | null;
+    max_uses_per_credential?: number;
     credential_id?: string | null;
     created_at?: string;
 }
@@ -52,6 +55,8 @@ export interface Order {
 
 export interface Credential {
     id: string;
+    group: string;
+    subgroup?: string | null;
     product_id?: string | null;
     variation_id?: string | null;
     email?: string | null;

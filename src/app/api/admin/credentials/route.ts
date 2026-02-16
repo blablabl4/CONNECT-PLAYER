@@ -3,9 +3,28 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-// GET: List all credentials with product/variation info
-export async function GET() {
+// GET: List all credentials (with optional group filter)
+export async function GET(request: NextRequest) {
     try {
+        const { searchParams } = new URL(request.url);
+        const groupsOnly = searchParams.get('groups_only');
+
+        // Return distinct groups for dropdowns
+        if (groupsOnly === 'true') {
+            const groups: any[] = await prisma.$queryRaw`
+                SELECT DISTINCT "group", subgroup, COUNT(*) as count
+                FROM credentials
+                WHERE "group" != ''
+                GROUP BY "group", subgroup
+                ORDER BY "group", subgroup
+            `;
+            return NextResponse.json(groups.map(g => ({
+                group: g.group,
+                subgroup: g.subgroup || null,
+                count: Number(g.count),
+            })));
+        }
+
         const credentials = await prisma.credential.findMany({
             include: { product: true, variation: true },
             orderBy: { created_at: 'desc' },
@@ -22,16 +41,16 @@ export async function GET() {
     }
 }
 
-// POST: Create credential
+// POST: Create credential (organized by group/subgroup, no product linking)
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { product_id, variation_id, email, password, link, max_uses } = body;
+        const { group, subgroup, email, password, link } = body;
 
-        // Validate: product and variation are required
-        if (!product_id || !variation_id) {
+        // Validate: group is required
+        if (!group || !group.trim()) {
             return NextResponse.json({
-                error: 'Produto e Variação são obrigatórios'
+                error: 'O grupo da credencial é obrigatório'
             }, { status: 400 });
         }
 
@@ -47,14 +66,13 @@ export async function POST(request: NextRequest) {
 
         const credential = await prisma.credential.create({
             data: {
-                product_id: product_id || null,
-                variation_id: variation_id || null,
+                group: group.trim(),
+                subgroup: subgroup?.trim() || null,
                 email: email || null,
                 password: password || null,
                 link: link || null,
-                max_uses: max_uses && max_uses > 0 ? max_uses : 1,
+                max_uses: 1,
             },
-            include: { product: true, variation: true },
         });
 
         return NextResponse.json(credential);
