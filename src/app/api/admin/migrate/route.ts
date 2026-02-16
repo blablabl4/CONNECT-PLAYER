@@ -171,6 +171,50 @@ export async function GET() {
             results.push('Added credentials.link column');
         } catch { results.push('credentials.link column already exists'); }
 
+        // ========== CREDENTIAL GROUPS MIGRATION ==========
+        // Add group/subgroup columns to credentials
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ADD COLUMN IF NOT EXISTS "group" TEXT NOT NULL DEFAULT ''`);
+            results.push('Added credentials.group column');
+        } catch { results.push('credentials.group already exists'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ADD COLUMN IF NOT EXISTS subgroup TEXT`);
+            results.push('Added credentials.subgroup column');
+        } catch { results.push('credentials.subgroup already exists'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ADD COLUMN IF NOT EXISTS max_uses INTEGER NOT NULL DEFAULT 1`);
+            results.push('Added credentials.max_uses column');
+        } catch { results.push('credentials.max_uses already exists'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE credentials ADD COLUMN IF NOT EXISTS current_uses INTEGER NOT NULL DEFAULT 0`);
+            results.push('Added credentials.current_uses column');
+        } catch { results.push('credentials.current_uses already exists'); }
+
+        // Add credential group fields to product_variations
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE product_variations ADD COLUMN IF NOT EXISTS credential_group TEXT`);
+            results.push('Added product_variations.credential_group column');
+        } catch { results.push('product_variations.credential_group already exists'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE product_variations ADD COLUMN IF NOT EXISTS credential_subgroup TEXT`);
+            results.push('Added product_variations.credential_subgroup column');
+        } catch { results.push('product_variations.credential_subgroup already exists'); }
+
+        try {
+            await prisma.$executeRawUnsafe(`ALTER TABLE product_variations ADD COLUMN IF NOT EXISTS max_uses_per_credential INTEGER NOT NULL DEFAULT 1`);
+            results.push('Added product_variations.max_uses_per_credential column');
+        } catch { results.push('product_variations.max_uses_per_credential already exists'); }
+
+        // Add index for credential group lookups
+        try {
+            await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_credentials_group_subgroup ON credentials("group", subgroup)`);
+            results.push('Added index: credentials(group, subgroup)');
+        } catch { results.push('credentials group index already exists'); }
+
         if (results.length === 1) {
             results.push('All tables already exist!');
         }
