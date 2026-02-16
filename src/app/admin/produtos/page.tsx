@@ -3,9 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminSidebar from '@/components/AdminSidebar';
-import { Product, ProductVariation } from '@/lib/types';
+import { Product, ProductVariation, Credential } from '@/lib/types';
 
-type CredGroup = { group: string; subgroup: string | null; count: number };
 
 const EMPTY_PRODUCT: Partial<Product> = {
     name: '', description: '', price: 0, image_url: '',
@@ -20,9 +19,7 @@ interface VarForm {
     price: number;
     duration?: string;
     original_price?: number | null;
-    credential_group?: string;
-    credential_subgroup?: string;
-    max_uses_per_credential?: number;
+    credential_id?: string;
     stock?: number;
 }
 
@@ -36,7 +33,7 @@ export default function AdminProductsPage() {
     const [featuresText, setFeaturesText] = useState('');
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<{ icon: string; name: string; color: string }[]>([]);
-    const [credGroups, setCredGroups] = useState<CredGroup[]>([]);
+    const [allCredentials, setAllCredentials] = useState<Credential[]>([]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('admin_auth')) {
@@ -44,7 +41,7 @@ export default function AdminProductsPage() {
         }
         fetchProducts();
         fetch('/api/admin/categories').then(r => r.json()).then(setCategories).catch(() => { });
-        fetch('/api/admin/credentials?groups_only=true').then(r => r.json()).then(setCredGroups).catch(() => { });
+        fetch('/api/admin/credentials').then(r => r.json()).then(setAllCredentials).catch(() => { });
     }, [router]);
 
     async function fetchProducts() {
@@ -55,13 +52,13 @@ export default function AdminProductsPage() {
         setProducts([]);
     }
 
-    const distinctGroups = [...new Set(credGroups.map(g => g.group))].sort();
-    const getSubgroups = (group: string) => credGroups.filter(g => g.group === group && g.subgroup).map(g => g.subgroup!);
+    // Available credentials (not fully used)
+    const availableCredentials = allCredentials.filter(c => !c.is_used);
 
     const openNewProduct = () => {
         setEditingProduct(null);
         setFormData(EMPTY_PRODUCT);
-        setVariations([{ name: '', price: 0, duration: '30 dias', credential_group: '', credential_subgroup: '', max_uses_per_credential: 1 }]);
+        setVariations([{ name: '', price: 0, duration: '30 dias', credential_id: '' }]);
         setFeaturesText('');
         setShowModal(true);
     };
@@ -77,23 +74,20 @@ export default function AdminProductsPage() {
         const existingVars = (product.variations || []).map((v: any) => ({
             id: v.id, name: v.name, description: v.description, price: v.price,
             duration: v.duration, original_price: v.original_price, stock: v.stock,
-            credential_group: v.credential_group || '', credential_subgroup: v.credential_subgroup || '',
-            max_uses_per_credential: v.max_uses_per_credential || 1,
+            credential_id: v.credential_id || '',
         }));
-        setVariations(existingVars.length > 0 ? existingVars : [{ name: product.name, price: product.price, duration: product.duration, credential_group: '', credential_subgroup: '', max_uses_per_credential: 1 }]);
+        setVariations(existingVars.length > 0 ? existingVars : [{ name: product.name, price: product.price, duration: product.duration, credential_id: '' }]);
         setFeaturesText((product.features || []).join('\n'));
         setShowModal(true);
     };
 
     const handleAddVariation = () => {
-        setVariations([...variations, { name: '', price: 0, duration: formData.duration || '30 dias', credential_group: '', credential_subgroup: '', max_uses_per_credential: 1 }]);
+        setVariations([...variations, { name: '', price: 0, duration: formData.duration || '30 dias', credential_id: '' }]);
     };
 
     const handleVarChange = (i: number, field: string, value: any) => {
         const newVars = [...variations];
         newVars[i] = { ...newVars[i], [field]: value };
-        // Reset subgroup when group changes
-        if (field === 'credential_group') newVars[i].credential_subgroup = '';
         setVariations(newVars);
     };
 
@@ -287,7 +281,7 @@ export default function AdminProductsPage() {
                                         <div>
                                             <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>Variações do Produto *</h4>
                                             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                                                Cada variação = uma opção de compra. Vincule o grupo de credenciais e defina o tipo de uso.
+                                                Cada variação = uma opção de compra. Selecione a credencial que será entregue.
                                             </p>
                                         </div>
                                         <button type="button" className="btn btn-sm btn-secondary" onClick={handleAddVariation}>+ Adicionar</button>
@@ -330,25 +324,35 @@ export default function AdminProductsPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Row: Credential Group + Subgroup + Max Uses */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>🔗 Grupo de Credenciais</label>
-                                                        <input type="text" className="form-input" list={`cg-${i}`} placeholder="Ex: ChatGPT" value={v.credential_group || ''} onChange={e => handleVarChange(i, 'credential_group', e.target.value)} />
-                                                        <datalist id={`cg-${i}`}>{distinctGroups.map(g => <option key={g} value={g} />)}</datalist>
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>📂 Subgrupo</label>
-                                                        <input type="text" className="form-input" list={`cs-${i}`} placeholder="Ex: Individual" value={v.credential_subgroup || ''} onChange={e => handleVarChange(i, 'credential_subgroup', e.target.value)} />
-                                                        <datalist id={`cs-${i}`}>{v.credential_group ? getSubgroups(v.credential_group).map(s => <option key={s} value={s} />) : null}</datalist>
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>👥 Máx. Usos</label>
-                                                        <input type="number" min="1" className="form-input" value={v.max_uses_per_credential || 1} onChange={e => handleVarChange(i, 'max_uses_per_credential', parseInt(e.target.value) || 1)} />
-                                                        <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                                            1 = individual • N = compartilhado
-                                                        </p>
-                                                    </div>
+                                                {/* Row: Credential Selector */}
+                                                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                                                    <label className="form-label" style={{ fontSize: '0.8rem' }}>🔗 Credencial vinculada</label>
+                                                    <select className="form-input" value={v.credential_id || ''} onChange={e => handleVarChange(i, 'credential_id', e.target.value)}>
+                                                        <option value="">Selecione uma credencial...</option>
+                                                        {availableCredentials.map(c => (
+                                                            <option key={c.id} value={c.id}>
+                                                                {c.email || c.link || '(sem dados)'} — {c.group}{c.subgroup ? `/${c.subgroup}` : ''} (usos: {c.current_uses}/{c.max_uses})
+                                                            </option>
+                                                        ))}
+                                                        {/* Also show the currently selected credential if it's fully used (so editing works) */}
+                                                        {v.credential_id && !availableCredentials.find(c => c.id === v.credential_id) && (() => {
+                                                            const selected = allCredentials.find(c => c.id === v.credential_id);
+                                                            return selected ? <option value={selected.id}>{selected.email || selected.link || '(sem dados)'} — {selected.group}{selected.subgroup ? `/${selected.subgroup}` : ''} (usos: {selected.current_uses}/{selected.max_uses}) ⚠️ esgotada</option> : null;
+                                                        })()}
+                                                    </select>
+                                                    {v.credential_id && (() => {
+                                                        const cred = allCredentials.find(c => c.id === v.credential_id);
+                                                        if (!cred) return null;
+                                                        const remaining = cred.max_uses - cred.current_uses;
+                                                        return (
+                                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.8rem', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                                                                <span style={{ color: 'var(--text-muted)' }}>📧 {cred.email || '—'}</span>
+                                                                <span style={{ color: 'var(--text-muted)' }}>🔑 {cred.password ? '••••••' : '—'}</span>
+                                                                <span style={{ color: 'var(--text-muted)' }}>🔗 {cred.link ? 'Sim' : '—'}</span>
+                                                                <span style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>📦 {remaining} uso(s) restante(s) (max: {cred.max_uses})</span>
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
 
                                                 {/* Stock indicator */}

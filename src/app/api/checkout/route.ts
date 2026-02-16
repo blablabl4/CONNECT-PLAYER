@@ -40,25 +40,23 @@ export async function POST(req: NextRequest) {
         const unitPrice = Number(variation.price);
         const itemName = `${product.name} - ${variation.name}`;
 
-        // Check stock using credential group/subgroup
-        const credGroup = (variation as any).credential_group || '';
-        const credSubgroup = (variation as any).credential_subgroup || null;
-        const maxUsesPerCred = (variation as any).max_uses_per_credential || 1;
+        // Check stock using directly linked credential
+        const linkedCredential = await prisma.credential.findFirst({
+            where: {
+                variation_id: variationId,
+                is_used: false,
+            },
+        });
 
-        const whereFilter: any = {
-            group: credGroup,
-            is_used: false,
-            current_uses: { lt: maxUsesPerCred },
-        };
-        if (credSubgroup) whereFilter.subgroup = credSubgroup;
+        const availableSlots = linkedCredential
+            ? linkedCredential.max_uses - linkedCredential.current_uses
+            : 0;
 
-        const availableCredentials = await prisma.credential.count({ where: whereFilter });
-
-        if (availableCredentials < quantity) {
+        if (availableSlots < quantity) {
             return NextResponse.json({
-                error: availableCredentials === 0
+                error: availableSlots === 0
                     ? 'Produto esgotado! Sem credenciais disponíveis no momento.'
-                    : `Estoque insuficiente. Disponível: ${availableCredentials} unidade(s).`
+                    : `Estoque insuficiente. Disponível: ${availableSlots} unidade(s).`
             }, { status: 400 });
         }
 

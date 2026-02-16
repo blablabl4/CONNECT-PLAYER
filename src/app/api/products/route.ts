@@ -7,31 +7,18 @@ export async function GET() {
     try {
         const products = await prisma.product.findMany({
             where: { is_active: true },
-            include: { variations: true },
+            include: { variations: { include: { credentials: true } } },
             orderBy: { created_at: 'desc' },
         });
-
-        // Get stock per credential group/subgroup
-        const credentialSlots = await prisma.credential.groupBy({
-            by: ['group', 'subgroup'],
-            where: { is_used: false, group: { not: '' } },
-            _sum: { max_uses: true, current_uses: true },
-        });
-
-        const stockMap = new Map<string, number>();
-        for (const c of credentialSlots) {
-            const key = `${c.group}:${c.subgroup || ''}`;
-            const remaining = (c._sum.max_uses || 0) - (c._sum.current_uses || 0);
-            stockMap.set(key, remaining);
-        }
 
         const serialized = products.map((p: any) => {
             let totalStock = 0;
             const vars = p.variations.map((v: any) => {
+                // Stock from directly linked credential
                 let varStock = 0;
-                if (v.credential_group) {
-                    const key = `${v.credential_group}:${v.credential_subgroup || ''}`;
-                    varStock = stockMap.get(key) || 0;
+                const linkedCred = (v.credentials || []).find((c: any) => !c.is_used);
+                if (linkedCred) {
+                    varStock = linkedCred.max_uses - linkedCred.current_uses;
                 }
                 totalStock += varStock;
                 return {
@@ -39,6 +26,7 @@ export async function GET() {
                     price: Number(v.price),
                     original_price: v.original_price ? Number(v.original_price) : null,
                     stock: varStock,
+                    credentials: undefined,
                 };
             });
             return {

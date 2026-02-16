@@ -38,47 +38,28 @@ export async function POST(request: NextRequest) {
         }
 
         if (mpStatus === 'approved') {
-            // Get credential group/subgroup and max_uses from the variation
-            const variation = order.variation as any;
-            const credGroup = variation?.credential_group || '';
-            const credSubgroup = variation?.credential_subgroup || null;
-            const maxUsesPerCred = variation?.max_uses_per_credential || 1;
-
-            // Find an available credential from the pool by group/subgroup
-            let credential: any;
-            if (credSubgroup) {
+            // Find the credential directly linked to this variation
+            let credential: any = null;
+            if (order.variation_id) {
                 credential = await prisma.credential.findFirst({
                     where: {
-                        group: credGroup,
-                        subgroup: credSubgroup,
+                        variation_id: order.variation_id,
                         is_used: false,
-                        current_uses: { lt: maxUsesPerCred },
-                    },
-                });
-            } else if (credGroup) {
-                credential = await prisma.credential.findFirst({
-                    where: {
-                        group: credGroup,
-                        is_used: false,
-                        current_uses: { lt: maxUsesPerCred },
                     },
                 });
             }
 
             if (credential) {
                 const newUses = credential.current_uses + 1;
-                const fullyUsed = newUses >= maxUsesPerCred;
+                const fullyUsed = newUses >= credential.max_uses;
 
                 await prisma.$transaction([
                     prisma.credential.update({
                         where: { id: credential.id },
                         data: {
                             current_uses: newUses,
-                            max_uses: maxUsesPerCred,
                             is_used: fullyUsed,
                             assigned_to: order.id,
-                            product_id: order.product_id,
-                            variation_id: order.variation_id,
                         },
                     }),
                     prisma.order.update({
