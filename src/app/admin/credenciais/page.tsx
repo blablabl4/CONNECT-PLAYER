@@ -15,11 +15,15 @@ type CredentialWithProduct = Credential & {
 export default function AdminCredentialsPage() {
     const router = useRouter();
     const [credentials, setCredentials] = useState<CredentialWithProduct[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState('');
+    const [selectedVariation, setSelectedVariation] = useState('');
     const [bulkText, setBulkText] = useState('');
     const [credType, setCredType] = useState<'email' | 'link'>('email');
-    const [newCred, setNewCred] = useState({ email: '', password: '', link: '' });
+    const [newCred, setNewCred] = useState({ product_id: '', variation_id: '', email: '', password: '', link: '', max_uses: 1 });
+    const [bulkMaxUses, setBulkMaxUses] = useState(1);
     const [filter, setFilter] = useState('all');
 
     useEffect(() => {
@@ -32,7 +36,12 @@ export default function AdminCredentialsPage() {
 
     async function fetchData() {
         try {
-            const credsRes = await fetch('/api/admin/credentials');
+            const [prodsRes, credsRes] = await Promise.all([
+                fetch('/api/admin/products'),
+                fetch('/api/admin/credentials'),
+            ]);
+
+            if (prodsRes.ok) setProducts(await prodsRes.json());
 
             if (credsRes.ok) {
                 const creds = await credsRes.json();
@@ -45,6 +54,7 @@ export default function AdminCredentialsPage() {
         } catch {
             // fallback
         }
+        setProducts([]);
         setCredentials([]);
     }
 
@@ -52,12 +62,25 @@ export default function AdminCredentialsPage() {
         : filter === 'available' ? credentials.filter(c => !c.is_used)
             : credentials.filter(c => c.is_used);
 
+    // Get current product variations
+    const currentProductInModal = products.find(p => p.id === newCred.product_id);
+    const currentProductInBulk = products.find(p => p.id === selectedProduct);
+
     const handleAddSingle = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const payload = credType === 'email'
-                ? { email: newCred.email, password: newCred.password }
-                : { link: newCred.link };
+            const payload: any = {
+                product_id: newCred.product_id || null,
+                variation_id: newCred.variation_id || null,
+                max_uses: newCred.max_uses || 1,
+            };
+
+            if (credType === 'email') {
+                payload.email = newCred.email;
+                payload.password = newCred.password;
+            } else {
+                payload.link = newCred.link;
+            }
 
             await fetch('/api/admin/credentials', {
                 method: 'POST',
@@ -67,7 +90,7 @@ export default function AdminCredentialsPage() {
         } catch { /* ignore */ }
         setShowModal(false);
         setCredType('email');
-        setNewCred({ email: '', password: '', link: '' });
+        setNewCred({ product_id: '', variation_id: '', email: '', password: '', link: '', max_uses: 1 });
         fetchData();
     };
 
@@ -76,7 +99,13 @@ export default function AdminCredentialsPage() {
         const lines = bulkText.split('\n').filter(l => l.trim());
         const creds = lines.map(line => {
             const [email, password] = line.split(/[;:,|]/).map(s => s.trim());
-            return { email, password };
+            return {
+                product_id: selectedProduct || null,
+                variation_id: selectedVariation || null,
+                email,
+                password,
+                max_uses: bulkMaxUses || 1,
+            };
         }).filter(c => c.email && c.password);
 
         try {
@@ -90,6 +119,9 @@ export default function AdminCredentialsPage() {
         } catch { /* demo */ }
         setShowBulkModal(false);
         setBulkText('');
+        setSelectedProduct('');
+        setSelectedVariation('');
+        setBulkMaxUses(1);
         fetchData();
     };
 
@@ -164,6 +196,7 @@ export default function AdminCredentialsPage() {
                                 <th>E-mail</th>
                                 <th>Senha</th>
                                 <th>Link</th>
+                                <th>Usos</th>
                                 <th>Status</th>
                                 <th>Ações</th>
                             </tr>
@@ -181,9 +214,10 @@ export default function AdminCredentialsPage() {
                                             </a>
                                         ) : '-'}
                                     </td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{cred.current_uses || 0}/{cred.max_uses || 1}</td>
                                     <td>
-                                        <span className={`badge ${cred.is_used ? 'badge-danger' : 'badge-success'}`}>
-                                            {cred.is_used ? 'Usada' : 'Disponível'}
+                                        <span className={`badge ${cred.is_used ? 'badge-danger' : (cred.current_uses || 0) > 0 ? 'badge-gold' : 'badge-success'}`}>
+                                            {cred.is_used ? 'Esgotada' : (cred.current_uses || 0) > 0 ? 'Em uso' : 'Disponível'}
                                         </span>
                                     </td>
                                     <td>
@@ -208,6 +242,22 @@ export default function AdminCredentialsPage() {
                                 <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
                             </div>
                             <form onSubmit={handleAddSingle}>
+                                <div className="form-group">
+                                    <label className="form-label">Produto</label>
+                                    <select className="form-input" value={newCred.product_id} onChange={e => setNewCred(prev => ({ ...prev, product_id: e.target.value, variation_id: '' }))}>
+                                        <option value="">Sem vínculo</option>
+                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                </div>
+                                {currentProductInModal && currentProductInModal.variations && currentProductInModal.variations.length > 0 && (
+                                    <div className="form-group">
+                                        <label className="form-label">Variação</label>
+                                        <select className="form-input" value={newCred.variation_id} onChange={e => setNewCred(prev => ({ ...prev, variation_id: e.target.value }))}>
+                                            <option value="">Selecione</option>
+                                            {currentProductInModal.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
                                 <div className="form-group">
                                     <label className="form-label">Tipo de Credencial</label>
                                     <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
@@ -252,6 +302,12 @@ export default function AdminCredentialsPage() {
                                     </div>
                                 )}
 
+                                <div className="form-group">
+                                    <label className="form-label">Máx. Usos</label>
+                                    <input type="number" className="form-input" min={1} value={newCred.max_uses} onChange={e => setNewCred(prev => ({ ...prev, max_uses: parseInt(e.target.value) || 1 }))} />
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Quantas vezes essa credencial pode ser usada (ex: 4 para 4 telas)</p>
+                                </div>
+
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                                     <button type="submit" className="btn btn-primary">Adicionar</button>
@@ -271,6 +327,22 @@ export default function AdminCredentialsPage() {
                             </div>
                             <form onSubmit={handleBulkAdd}>
                                 <div className="form-group">
+                                    <label className="form-label">Produto</label>
+                                    <select className="form-input" value={selectedProduct} onChange={e => { setSelectedProduct(e.target.value); setSelectedVariation(''); }}>
+                                        <option value="">Sem vínculo</option>
+                                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                </div>
+                                {currentProductInBulk && currentProductInBulk.variations && currentProductInBulk.variations.length > 0 && (
+                                    <div className="form-group">
+                                        <label className="form-label">Variação</label>
+                                        <select className="form-input" value={selectedVariation} onChange={e => setSelectedVariation(e.target.value)}>
+                                            <option value="">Selecione</option>
+                                            {currentProductInBulk.variations.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+                                <div className="form-group">
                                     <label className="form-label">Credenciais (uma por linha, formato: email;senha)</label>
                                     <textarea
                                         className="form-input" rows={8} required
@@ -279,6 +351,11 @@ export default function AdminCredentialsPage() {
                                         onChange={e => setBulkText(e.target.value)}
                                         style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '0.85rem' }}
                                     />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Máx. Usos (por credencial)</label>
+                                    <input type="number" className="form-input" min={1} value={bulkMaxUses} onChange={e => setBulkMaxUses(parseInt(e.target.value) || 1)} />
+                                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>Quantas vezes cada credencial pode ser usada</p>
                                 </div>
                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '20px' }}>
                                     Separadores aceitos: ; : , |

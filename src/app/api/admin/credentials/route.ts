@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { product_id, variation_id, email, password, link } = body;
+        const { product_id, variation_id, email, password, link, max_uses } = body;
 
         // Validate: must have either (email AND password) OR link
         const hasEmailPassword = email && password;
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
                 email: email || null,
                 password: password || null,
                 link: link || null,
+                max_uses: max_uses && max_uses > 0 ? max_uses : 1,
             },
             include: { product: true, variation: true },
         });

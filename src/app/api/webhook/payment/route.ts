@@ -69,21 +69,28 @@ export async function POST(request: NextRequest) {
         }
 
         if (mpStatus === 'approved') {
-            // Find an available credential — strictly match variation
+            // Find an available credential — strictly match variation, supports multi-use
             const credential = await prisma.credential.findFirst({
                 where: {
                     product_id: order.product_id,
-                    is_used: false,
                     variation_id: order.variation_id || null,
+                    is_used: false,
                 },
             });
 
             if (credential) {
-                // Mark credential as used and assign to order
+                const newUses = credential.current_uses + 1;
+                const fullyUsed = newUses >= credential.max_uses;
+
+                // Increment usage and assign to order
                 await prisma.$transaction([
                     prisma.credential.update({
                         where: { id: credential.id },
-                        data: { is_used: true, assigned_to: order.id },
+                        data: {
+                            current_uses: newUses,
+                            is_used: fullyUsed,
+                            assigned_to: order.id,
+                        },
                     }),
                     prisma.order.update({
                         where: { id: order.id },

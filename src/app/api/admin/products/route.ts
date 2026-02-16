@@ -11,34 +11,36 @@ export async function GET() {
             orderBy: { created_at: 'desc' },
         });
 
-        // Get credential counts for dynamic stock
-        const credentialCounts = await prisma.credential.groupBy({
-            by: ['product_id', 'variation_id'],
-            where: { is_used: false },
-            _count: { id: true },
-        });
+        // Get remaining uses for dynamic stock (supports multi-use credentials)
+        const credentialSlots: any[] = await prisma.$queryRaw`
+            SELECT product_id, variation_id, SUM(max_uses - current_uses) as remaining
+            FROM credentials
+            WHERE is_used = false
+            GROUP BY product_id, variation_id
+        `;
 
         const stockMap = new Map<string, number>();
-        for (const c of credentialCounts) {
+        for (const c of credentialSlots) {
             // Skip credentials without product_id (unlinked credentials)
             if (!c.product_id) continue;
 
+            const remaining = Number(c.remaining);
             if (c.variation_id) {
-                stockMap.set(`${c.product_id}:${c.variation_id}`, c._count.id);
+                stockMap.set(`${c.product_id}:${c.variation_id}`, remaining);
             }
             const current = stockMap.get(c.product_id) || 0;
-            stockMap.set(c.product_id, current + c._count.id);
+            stockMap.set(c.product_id, current + remaining);
         }
 
         return NextResponse.json(products.map((p: any) => ({
             ...p,
             price: Number(p.price),
-            stock: stockMap.has(p.id) ? stockMap.get(p.id)! : p.stock,
+            stock: stockMap.get(p.id) || 0,
             variations: p.variations.map((v: any) => ({
                 ...v,
                 price: Number(v.price),
                 original_price: v.original_price ? Number(v.original_price) : null,
-                stock: stockMap.has(`${p.id}:${v.id}`) ? stockMap.get(`${p.id}:${v.id}`)! : v.stock,
+                stock: stockMap.get(`${p.id}:${v.id}`) || 0,
             })),
         })));
     } catch (error) {

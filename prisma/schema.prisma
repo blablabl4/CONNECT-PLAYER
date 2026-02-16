@@ -56,6 +56,8 @@ model Credential {
   password       String?
   link           String?
   is_used        Boolean           @default(false)
+  max_uses       Int               @default(1)
+  current_uses   Int               @default(0)
   assigned_to    String?           @db.Uuid
   created_at     DateTime          @default(now()) @db.Timestamptz
 

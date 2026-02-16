@@ -46,14 +46,22 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Check stock (available credentials) — strictly match variation
-        const availableCredentials = await prisma.credential.count({
-            where: {
-                product_id: product.id,
-                is_used: false,
-                variation_id: variationId || null,
-            },
-        });
+        // Check stock (available credential slots) — supports multi-use credentials
+        let stockResult: any[];
+        if (variationId) {
+            stockResult = await prisma.$queryRaw`
+                SELECT COALESCE(SUM(max_uses - current_uses), 0) as available
+                FROM credentials
+                WHERE product_id = ${product.id}::uuid AND is_used = false AND variation_id = ${variationId}::uuid
+            `;
+        } else {
+            stockResult = await prisma.$queryRaw`
+                SELECT COALESCE(SUM(max_uses - current_uses), 0) as available
+                FROM credentials
+                WHERE product_id = ${product.id}::uuid AND is_used = false AND variation_id IS NULL
+            `;
+        }
+        const availableCredentials = Number(stockResult[0]?.available || 0);
 
         if (availableCredentials < quantity) {
             return NextResponse.json(

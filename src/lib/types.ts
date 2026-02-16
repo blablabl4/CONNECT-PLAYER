@@ -58,6 +58,8 @@ export interface Credential {
     password?: string | null;
     link?: string | null;
     is_used: boolean;
+    max_uses: number;
+    current_uses: number;
     assigned_to?: string | null;
     created_at: string;
     product?: Product;
