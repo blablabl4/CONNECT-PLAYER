@@ -11,17 +11,16 @@ export async function GET(request: NextRequest) {
 
         // Return distinct groups for dropdowns
         if (groupsOnly === 'true') {
-            const groups: any[] = await prisma.$queryRaw`
-                SELECT DISTINCT "group", subgroup, COUNT(*) as count
-                FROM credentials
-                WHERE "group" != ''
-                GROUP BY "group", subgroup
-                ORDER BY "group", subgroup
-            `;
+            const groups = await prisma.credential.groupBy({
+                by: ['group', 'subgroup'],
+                where: { group: { not: '' } },
+                _count: { id: true },
+                orderBy: [{ group: 'asc' }, { subgroup: 'asc' }],
+            });
             return NextResponse.json(groups.map(g => ({
                 group: g.group,
                 subgroup: g.subgroup || null,
-                count: Number(g.count),
+                count: g._count.id,
             })));
         }
 

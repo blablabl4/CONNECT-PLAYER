@@ -45,21 +45,14 @@ export async function POST(req: NextRequest) {
         const credSubgroup = (variation as any).credential_subgroup || null;
         const maxUsesPerCred = (variation as any).max_uses_per_credential || 1;
 
-        let stockResult: any[];
-        if (credSubgroup) {
-            stockResult = await prisma.$queryRaw`
-                SELECT COALESCE(SUM(${maxUsesPerCred} - current_uses), 0) as available
-                FROM credentials
-                WHERE "group" = ${credGroup} AND subgroup = ${credSubgroup} AND is_used = false AND current_uses < ${maxUsesPerCred}
-            `;
-        } else {
-            stockResult = await prisma.$queryRaw`
-                SELECT COALESCE(SUM(${maxUsesPerCred} - current_uses), 0) as available
-                FROM credentials
-                WHERE "group" = ${credGroup} AND is_used = false AND current_uses < ${maxUsesPerCred}
-            `;
-        }
-        const availableCredentials = Number(stockResult[0]?.available || 0);
+        const whereFilter: any = {
+            group: credGroup,
+            is_used: false,
+            current_uses: { lt: maxUsesPerCred },
+        };
+        if (credSubgroup) whereFilter.subgroup = credSubgroup;
+
+        const availableCredentials = await prisma.credential.count({ where: whereFilter });
 
         if (availableCredentials < quantity) {
             return NextResponse.json({

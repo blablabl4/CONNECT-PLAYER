@@ -12,19 +12,18 @@ export async function GET() {
         });
 
         // Get stock per group/subgroup from credentials
-        const credentialSlots: any[] = await prisma.$queryRaw`
-            SELECT "group", subgroup, 
-                   SUM(max_uses - current_uses) as remaining,
-                   COUNT(*) as total_creds
-            FROM credentials
-            WHERE is_used = false AND "group" != ''
-            GROUP BY "group", subgroup
-        `;
+        const credentialSlots = await prisma.credential.groupBy({
+            by: ['group', 'subgroup'],
+            where: { is_used: false, group: { not: '' } },
+            _count: { id: true },
+            _sum: { max_uses: true, current_uses: true },
+        });
 
         const stockMap = new Map<string, number>();
         for (const c of credentialSlots) {
             const key = `${c.group}:${c.subgroup || ''}`;
-            stockMap.set(key, Number(c.remaining));
+            const remaining = (c._sum.max_uses || 0) - (c._sum.current_uses || 0);
+            stockMap.set(key, remaining);
         }
 
         return NextResponse.json(products.map((p: any) => {
