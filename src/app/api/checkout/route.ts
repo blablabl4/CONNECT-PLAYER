@@ -40,16 +40,14 @@ export async function POST(req: NextRequest) {
         const unitPrice = Number(variation.price);
         const itemName = `${product.name} - ${variation.name}`;
 
-        // Check stock using directly linked credential
-        const linkedCredential = await prisma.credential.findFirst({
-            where: {
-                variation_id: variationId,
-                is_used: false,
-            },
+        // Check stock using directly linked credential (compare current_uses < max_uses)
+        const allLinkedCreds = await prisma.credential.findMany({
+            where: { variation_id: variationId },
         });
+        const availableCred = allLinkedCreds.find(c => c.current_uses < c.max_uses);
 
-        const availableSlots = linkedCredential
-            ? linkedCredential.max_uses - linkedCredential.current_uses
+        const availableSlots = availableCred
+            ? availableCred.max_uses - availableCred.current_uses
             : 0;
 
         if (availableSlots < quantity) {

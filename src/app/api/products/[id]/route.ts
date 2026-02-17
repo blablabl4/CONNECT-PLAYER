@@ -22,7 +22,7 @@ export async function GET(
         const variations = product.variations.map((v: any) => {
             // Stock from directly linked credential
             let varStock = 0;
-            const linkedCred = (v.credentials || []).find((c: any) => !c.is_used);
+            const linkedCred = (v.credentials || []).find((c: any) => c.current_uses < c.max_uses);
             if (linkedCred) {
                 varStock = linkedCred.max_uses - linkedCred.current_uses;
             }

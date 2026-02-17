@@ -91,6 +91,17 @@ export async function PUT(request: NextRequest) {
             return NextResponse.json({ error: 'ID obrigatório' }, { status: 400 });
         }
 
+        // Auto-sync is_used based on current_uses vs max_uses
+        if (data.max_uses !== undefined && data.current_uses !== undefined) {
+            data.is_used = data.current_uses >= data.max_uses;
+        } else if (data.max_uses !== undefined) {
+            // Fetch current to compare
+            const existing = await prisma.credential.findUnique({ where: { id } });
+            if (existing) {
+                data.is_used = (data.current_uses ?? existing.current_uses) >= data.max_uses;
+            }
+        }
+
         const credential = await prisma.credential.update({
             where: { id },
             data,

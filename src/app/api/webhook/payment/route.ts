@@ -38,15 +38,13 @@ export async function POST(request: NextRequest) {
         }
 
         if (mpStatus === 'approved') {
-            // Find the credential directly linked to this variation
+            // Find the credential directly linked to this variation with remaining uses
             let credential: any = null;
             if (order.variation_id) {
-                credential = await prisma.credential.findFirst({
-                    where: {
-                        variation_id: order.variation_id,
-                        is_used: false,
-                    },
+                const linkedCreds = await prisma.credential.findMany({
+                    where: { variation_id: order.variation_id },
                 });
+                credential = linkedCreds.find(c => c.current_uses < c.max_uses) || null;
             }
 
             if (credential) {

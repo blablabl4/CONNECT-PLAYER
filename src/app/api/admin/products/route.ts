@@ -14,9 +14,9 @@ export async function GET() {
         return NextResponse.json(products.map((p: any) => {
             let totalStock = 0;
             const vars = p.variations.map((v: any) => {
-                // Stock = sum of remaining uses across all linked credentials
+                // Stock = remaining uses from linked credential where uses remain
                 let varStock = 0;
-                const linkedCred = (v.credentials || []).find((c: any) => !c.is_used);
+                const linkedCred = (v.credentials || []).find((c: any) => c.current_uses < c.max_uses);
                 if (linkedCred) {
                     varStock = linkedCred.max_uses - linkedCred.current_uses;
                 }
