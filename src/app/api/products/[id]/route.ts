@@ -20,11 +20,12 @@ export async function GET(
 
         let totalStock = 0;
         const variations = product.variations.map((v: any) => {
-            // Stock from directly linked credential
+            // Stock = sum of remaining uses across all linked credentials
             let varStock = 0;
-            const linkedCred = (v.credentials || []).find((c: any) => c.current_uses < c.max_uses);
-            if (linkedCred) {
-                varStock = linkedCred.max_uses - linkedCred.current_uses;
+            for (const c of (v.credentials || [])) {
+                if (c.current_uses < c.max_uses) {
+                    varStock += c.max_uses - c.current_uses;
+                }
             }
             totalStock += varStock;
             return {

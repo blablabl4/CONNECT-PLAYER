@@ -14,11 +14,14 @@ export async function GET() {
         return NextResponse.json(products.map((p: any) => {
             let totalStock = 0;
             const vars = p.variations.map((v: any) => {
-                // Stock = remaining uses from linked credential where uses remain
+                // Stock = sum of remaining uses across ALL linked credentials
                 let varStock = 0;
-                const linkedCred = (v.credentials || []).find((c: any) => c.current_uses < c.max_uses);
-                if (linkedCred) {
-                    varStock = linkedCred.max_uses - linkedCred.current_uses;
+                const credIds: string[] = [];
+                for (const c of (v.credentials || [])) {
+                    if (c.current_uses < c.max_uses) {
+                        varStock += c.max_uses - c.current_uses;
+                    }
+                    credIds.push(c.id);
                 }
                 totalStock += varStock;
                 return {
@@ -26,8 +29,8 @@ export async function GET() {
                     price: Number(v.price),
                     original_price: v.original_price ? Number(v.original_price) : null,
                     stock: varStock,
-                    credential_id: linkedCred?.id || (v.credentials?.[0]?.id) || null,
-                    credentials: undefined, // Don't expose full credentials list
+                    credential_ids: credIds,
+                    credentials: undefined,
                 };
             });
             return {
@@ -78,17 +81,19 @@ export async function POST(request: NextRequest) {
             include: { variations: true },
         });
 
-        // Link credentials to variations
+        // Link credentials to variations (supports multiple per variation)
         for (let i = 0; i < variations.length; i++) {
-            const credId = variations[i].credential_id;
-            if (credId && product.variations[i]) {
-                await prisma.credential.update({
-                    where: { id: credId },
-                    data: {
-                        variation_id: product.variations[i].id,
-                        product_id: product.id,
-                    },
-                });
+            const credIds = variations[i].credential_ids || (variations[i].credential_id ? [variations[i].credential_id] : []);
+            if (credIds.length > 0 && product.variations[i]) {
+                for (const credId of credIds) {
+                    await prisma.credential.update({
+                        where: { id: credId },
+                        data: {
+                            variation_id: product.variations[i].id,
+                            product_id: product.id,
+                        },
+                    });
+                }
             }
         }
 
@@ -159,16 +164,17 @@ export async function PUT(request: NextRequest) {
                     varId = created.id;
                 }
 
-                // Unlink old credential from this variation
+                // Unlink old credentials from this variation
                 await prisma.credential.updateMany({
                     where: { variation_id: varId },
                     data: { variation_id: null, product_id: null },
                 });
 
-                // Link new credential
-                if (v.credential_id) {
+                // Link new credentials (supports multiple)
+                const credIds = v.credential_ids || (v.credential_id ? [v.credential_id] : []);
+                for (const credId of credIds) {
                     await prisma.credential.update({
-                        where: { id: v.credential_id },
+                        where: { id: credId },
                         data: {
                             variation_id: varId,
                             product_id: id,
@@ -186,11 +192,11 @@ export async function PUT(request: NextRequest) {
         return NextResponse.json({
             ...updated, price: Number(updated!.price),
             variations: updated!.variations.map((v: any) => {
-                const linkedCred = (v.credentials || []).find((c: any) => !c.is_used) || v.credentials?.[0];
+                const credIds = (v.credentials || []).map((c: any) => c.id);
                 return {
                     ...v, price: Number(v.price),
                     original_price: v.original_price ? Number(v.original_price) : null,
-                    credential_id: linkedCred?.id || null,
+                    credential_ids: credIds,
                     credentials: undefined,
                 };
             }),

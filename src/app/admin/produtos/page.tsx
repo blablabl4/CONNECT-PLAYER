@@ -19,7 +19,7 @@ interface VarForm {
     price: number;
     duration?: string;
     original_price?: number | null;
-    credential_id?: string;
+    credential_ids: string[];
     stock?: number;
 }
 
@@ -53,12 +53,12 @@ export default function AdminProductsPage() {
     }
 
     // Available credentials (not fully used)
-    const availableCredentials = allCredentials.filter(c => !c.is_used);
+    const availableCredentials = allCredentials.filter(c => c.current_uses < c.max_uses);
 
     const openNewProduct = () => {
         setEditingProduct(null);
         setFormData(EMPTY_PRODUCT);
-        setVariations([{ name: '', price: 0, duration: '30 dias', credential_id: '' }]);
+        setVariations([{ name: '', price: 0, duration: '30 dias', credential_ids: [] }]);
         setFeaturesText('');
         setShowModal(true);
     };
@@ -74,15 +74,15 @@ export default function AdminProductsPage() {
         const existingVars = (product.variations || []).map((v: any) => ({
             id: v.id, name: v.name, description: v.description, price: v.price,
             duration: v.duration, original_price: v.original_price, stock: v.stock,
-            credential_id: v.credential_id || '',
+            credential_ids: v.credential_ids || [],
         }));
-        setVariations(existingVars.length > 0 ? existingVars : [{ name: product.name, price: product.price, duration: product.duration, credential_id: '' }]);
+        setVariations(existingVars.length > 0 ? existingVars : [{ name: product.name, price: product.price, duration: product.duration, credential_ids: [] }]);
         setFeaturesText((product.features || []).join('\n'));
         setShowModal(true);
     };
 
     const handleAddVariation = () => {
-        setVariations([...variations, { name: '', price: 0, duration: formData.duration || '30 dias', credential_id: '' }]);
+        setVariations([...variations, { name: '', price: 0, duration: formData.duration || '30 dias', credential_ids: [] }]);
     };
 
     const handleVarChange = (i: number, field: string, value: any) => {
@@ -326,45 +326,66 @@ export default function AdminProductsPage() {
                                                     </div>
                                                 </div>
 
-                                                {/* Row: Credential Selector */}
+                                                {/* Row: Credential Selector (multi) */}
                                                 <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                                                    <label className="form-label" style={{ fontSize: '0.8rem' }}>🔗 Credencial vinculada</label>
-                                                    <select className="form-input" value={v.credential_id || ''} onChange={e => handleVarChange(i, 'credential_id', e.target.value)}>
-                                                        <option value="">Selecione uma credencial...</option>
-                                                        {availableCredentials.map(c => (
-                                                            <option key={c.id} value={c.id}>
-                                                                {c.email || c.link || '(sem dados)'} — {c.group}{c.subgroup ? `/${c.subgroup}` : ''} (usos: {c.current_uses}/{c.max_uses})
-                                                            </option>
-                                                        ))}
-                                                        {/* Also show the currently selected credential if it's fully used (so editing works) */}
-                                                        {v.credential_id && !availableCredentials.find(c => c.id === v.credential_id) && (() => {
-                                                            const selected = allCredentials.find(c => c.id === v.credential_id);
-                                                            return selected ? <option value={selected.id}>{selected.email || selected.link || '(sem dados)'} — {selected.group}{selected.subgroup ? `/${selected.subgroup}` : ''} (usos: {selected.current_uses}/{selected.max_uses}) ⚠️ esgotada</option> : null;
-                                                        })()}
-                                                    </select>
-                                                    {v.credential_id && (() => {
-                                                        const cred = allCredentials.find(c => c.id === v.credential_id);
-                                                        if (!cred) return null;
-                                                        const remaining = cred.max_uses - cred.current_uses;
+                                                    <label className="form-label" style={{ fontSize: '0.8rem' }}>🔗 Credenciais vinculadas ({v.credential_ids.length})</label>
+
+                                                    {/* Add credential selector */}
+                                                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                                                        <select className="form-input" id={`cred-select-${i}`} defaultValue="">
+                                                            <option value="">Selecione para adicionar...</option>
+                                                            {availableCredentials
+                                                                .filter(c => !v.credential_ids.includes(c.id))
+                                                                .map(c => (
+                                                                    <option key={c.id} value={c.id}>
+                                                                        {c.email || c.link || '(sem dados)'} — {c.group}{c.subgroup ? `/${c.subgroup}` : ''} ({c.current_uses}/{c.max_uses} usos)
+                                                                    </option>
+                                                                ))}
+                                                        </select>
+                                                        <button type="button" className="btn btn-sm" style={{ background: 'var(--accent-gold)', color: '#000', fontWeight: 700, whiteSpace: 'nowrap', padding: '6px 12px' }} onClick={() => {
+                                                            const sel = document.getElementById(`cred-select-${i}`) as HTMLSelectElement;
+                                                            if (sel?.value) {
+                                                                handleVarChange(i, 'credential_ids', [...v.credential_ids, sel.value]);
+                                                                sel.value = '';
+                                                            }
+                                                        }}>+ Adicionar</button>
+                                                    </div>
+
+                                                    {/* List of linked credentials */}
+                                                    {v.credential_ids.length > 0 && (
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            {v.credential_ids.map(credId => {
+                                                                const cred = allCredentials.find(c => c.id === credId);
+                                                                if (!cred) return null;
+                                                                const remaining = cred.max_uses - cred.current_uses;
+                                                                return (
+                                                                    <div key={credId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.8rem' }}>
+                                                                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', overflow: 'hidden' }}>
+                                                                            <span style={{ color: 'var(--text-muted)' }}>{cred.email || cred.link || '(sem dados)'}</span>
+                                                                            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{cred.group}{cred.subgroup ? `/${cred.subgroup}` : ''}</span>
+                                                                            <span style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>{remaining}/{cred.max_uses}</span>
+                                                                        </div>
+                                                                        <button type="button" onClick={() => handleVarChange(i, 'credential_ids', v.credential_ids.filter((id: string) => id !== credId))} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.9rem', padding: '2px 6px' }} title="Remover">✕</button>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Stock indicator from credential uses */}
+                                                    {(() => {
+                                                        let totalRemaining = 0;
+                                                        for (const credId of v.credential_ids) {
+                                                            const c = allCredentials.find(cr => cr.id === credId);
+                                                            if (c && c.current_uses < c.max_uses) totalRemaining += c.max_uses - c.current_uses;
+                                                        }
                                                         return (
-                                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.8rem' }}>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
-                                                                    <span style={{ color: 'var(--text-muted)' }}>📧 {cred.email || '—'}</span>
-                                                                    <span style={{ color: 'var(--text-muted)' }}>🔑 {cred.password ? '••••••' : '—'}</span>
-                                                                    <span style={{ color: 'var(--text-muted)' }}>🔗 {cred.link ? 'Sim' : '—'}</span>
-                                                                    <span style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>📦 {remaining}/{cred.max_uses} usos</span>
-                                                                </div>
+                                                            <div style={{ marginTop: '8px', padding: '6px 10px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                                                📦 Estoque: <strong style={{ color: totalRemaining > 0 ? 'var(--success)' : 'var(--danger)' }}>{totalRemaining}</strong> unidades disponíveis
                                                             </div>
                                                         );
                                                     })()}
                                                 </div>
-
-                                                {/* Stock indicator */}
-                                                {v.id && (
-                                                    <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                                        📦 Estoque: <strong style={{ color: (v.stock || 0) > 0 ? 'var(--success)' : 'var(--danger)' }}>{v.stock || 0}</strong> unidades disponíveis
-                                                    </div>
-                                                )}
                                             </div>
                                         ))}
                                     </div>
