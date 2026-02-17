@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { group, subgroup, email, password, link } = body;
+        const { group, subgroup, email, password, link, max_uses } = body;
 
         // Validate: group is required
         if (!group || !group.trim()) {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
                 email: email || null,
                 password: password || null,
                 link: link || null,
-                max_uses: 1,
+                max_uses: max_uses || 1,
             },
         });
 

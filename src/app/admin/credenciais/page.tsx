@@ -16,15 +16,19 @@ export default function AdminCredentialsPage() {
 
     // Single add
     const [credType, setCredType] = useState<'email' | 'link'>('email');
-    const [newCred, setNewCred] = useState({ group: '', subgroup: '', email: '', password: '', link: '' });
+    const [newCred, setNewCred] = useState({ group: '', subgroup: '', email: '', password: '', link: '', max_uses: 1 });
 
     // Bulk add
     const [bulkGroup, setBulkGroup] = useState('');
     const [bulkSubgroup, setBulkSubgroup] = useState('');
     const [bulkText, setBulkText] = useState('');
+    const [bulkMaxUses, setBulkMaxUses] = useState(1);
 
     const [filter, setFilter] = useState('all');
     const [groupFilter, setGroupFilter] = useState('');
+
+    // Edit
+    const [editCred, setEditCred] = useState<CredView | null>(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && !localStorage.getItem('admin_auth')) {
@@ -54,7 +58,7 @@ export default function AdminCredentialsPage() {
         e.preventDefault();
         if (!newCred.group.trim()) { alert('Informe o grupo.'); return; }
 
-        const payload: any = { group: newCred.group, subgroup: newCred.subgroup || null };
+        const payload: any = { group: newCred.group, subgroup: newCred.subgroup || null, max_uses: newCred.max_uses };
         if (credType === 'email') { payload.email = newCred.email; payload.password = newCred.password; }
         else { payload.link = newCred.link; }
 
@@ -62,7 +66,7 @@ export default function AdminCredentialsPage() {
             await fetch('/api/admin/credentials', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         } catch { }
         setShowModal(false);
-        setNewCred({ group: '', subgroup: '', email: '', password: '', link: '' });
+        setNewCred({ group: '', subgroup: '', email: '', password: '', link: '', max_uses: 1 });
         setCredType('email');
         fetchData();
     };
@@ -74,17 +78,41 @@ export default function AdminCredentialsPage() {
         for (const line of lines) {
             const [email, password] = line.split(/[;:,|]/).map(s => s.trim());
             if (email && password) {
-                try { await fetch('/api/admin/credentials', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group: bulkGroup, subgroup: bulkSubgroup || null, email, password }) }); } catch { }
+                try { await fetch('/api/admin/credentials', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ group: bulkGroup, subgroup: bulkSubgroup || null, email, password, max_uses: bulkMaxUses }) }); } catch { }
             }
         }
         setShowBulkModal(false);
-        setBulkGroup(''); setBulkSubgroup(''); setBulkText('');
+        setBulkGroup(''); setBulkSubgroup(''); setBulkText(''); setBulkMaxUses(1);
         fetchData();
     };
 
     const deleteCred = async (id: string) => {
         if (!confirm('Excluir esta credencial?')) return;
         try { await fetch(`/api/admin/credentials?id=${id}`, { method: 'DELETE' }); } catch { }
+        fetchData();
+    };
+
+    const handleEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editCred) return;
+        try {
+            await fetch('/api/admin/credentials', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editCred.id,
+                    group: editCred.group,
+                    subgroup: editCred.subgroup || null,
+                    email: editCred.email || null,
+                    password: editCred.password || null,
+                    link: editCred.link || null,
+                    max_uses: editCred.max_uses,
+                    current_uses: editCred.current_uses,
+                    is_used: editCred.is_used,
+                }),
+            });
+        } catch { }
+        setEditCred(null);
         fetchData();
     };
 
@@ -145,7 +173,12 @@ export default function AdminCredentialsPage() {
                                             {c.is_used ? 'Esgotada' : (c.current_uses || 0) > 0 ? 'Em uso' : 'Disponível'}
                                         </span>
                                     </td>
-                                    <td>{!c.is_used && <button className="btn btn-sm" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)' }} onClick={() => deleteCred(c.id)}>🗑️</button>}</td>
+                                    <td>
+                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                            <button className="btn btn-sm" style={{ color: 'var(--accent-gold)', background: 'rgba(229,168,53,0.1)' }} onClick={() => setEditCred({ ...c })} title="Editar">✏️</button>
+                                            {!c.is_used && <button className="btn btn-sm" style={{ color: 'var(--danger)', background: 'rgba(239,68,68,0.1)' }} onClick={() => deleteCred(c.id)} title="Excluir">🗑️</button>}
+                                        </div>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -171,6 +204,20 @@ export default function AdminCredentialsPage() {
                                         <label className="form-label">Subgrupo</label>
                                         <input type="text" className="form-input" placeholder="Ex: Individual, Compartilhado" value={newCred.subgroup} onChange={e => setNewCred(p => ({ ...p, subgroup: e.target.value }))} />
                                     </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Máx. Usos</label>
+                                    <select className="form-input" value={newCred.max_uses} onChange={e => setNewCred(p => ({ ...p, max_uses: parseInt(e.target.value) }))}>
+                                        <option value={1}>1 uso (único)</option>
+                                        <option value={2}>2 usos</option>
+                                        <option value={3}>3 usos</option>
+                                        <option value={5}>5 usos</option>
+                                        <option value={10}>10 usos</option>
+                                        <option value={20}>20 usos</option>
+                                        <option value={50}>50 usos</option>
+                                        <option value={999}>Ilimitado (999)</option>
+                                    </select>
                                 </div>
 
                                 <div className="form-group">
@@ -233,6 +280,19 @@ export default function AdminCredentialsPage() {
                                     </div>
                                 </div>
                                 <div className="form-group">
+                                    <label className="form-label">Máx. Usos por credencial</label>
+                                    <select className="form-input" value={bulkMaxUses} onChange={e => setBulkMaxUses(parseInt(e.target.value))}>
+                                        <option value={1}>1 uso (único)</option>
+                                        <option value={2}>2 usos</option>
+                                        <option value={3}>3 usos</option>
+                                        <option value={5}>5 usos</option>
+                                        <option value={10}>10 usos</option>
+                                        <option value={20}>20 usos</option>
+                                        <option value={50}>50 usos</option>
+                                        <option value={999}>Ilimitado (999)</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
                                     <label className="form-label">Credenciais (email;senha por linha) *</label>
                                     <textarea className="form-input" rows={8} required placeholder={"user1@email.com;senha123\nuser2@email.com;senha456"} value={bulkText} onChange={e => setBulkText(e.target.value)} style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: '0.85rem' }} />
                                 </div>
@@ -240,6 +300,77 @@ export default function AdminCredentialsPage() {
                                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowBulkModal(false)}>Cancelar</button>
                                     <button type="submit" className="btn btn-primary">Importar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Modal */}
+                {editCred && (
+                    <div className="modal-overlay" onClick={() => setEditCred(null)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '550px' }}>
+                            <div className="modal-header">
+                                <h3 className="modal-title">Editar Credencial</h3>
+                                <button className="modal-close" onClick={() => setEditCred(null)}>✕</button>
+                            </div>
+                            <form onSubmit={handleEdit}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Grupo *</label>
+                                        <input type="text" className="form-input" required list="group-edit" value={editCred.group} onChange={e => setEditCred(p => p ? { ...p, group: e.target.value } : p)} />
+                                        <datalist id="group-edit">{groups.map(g => <option key={g} value={g} />)}</datalist>
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Subgrupo</label>
+                                        <input type="text" className="form-input" value={editCred.subgroup || ''} onChange={e => setEditCred(p => p ? { ...p, subgroup: e.target.value } : p)} />
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Email</label>
+                                        <input type="text" className="form-input" placeholder="email@example.com" value={editCred.email || ''} onChange={e => setEditCred(p => p ? { ...p, email: e.target.value } : p)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Senha</label>
+                                        <input type="text" className="form-input" placeholder="senha123" value={editCred.password || ''} onChange={e => setEditCred(p => p ? { ...p, password: e.target.value } : p)} />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Link</label>
+                                    <input type="text" className="form-input" placeholder="https://..." value={editCred.link || ''} onChange={e => setEditCred(p => p ? { ...p, link: e.target.value } : p)} />
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                                    <div className="form-group">
+                                        <label className="form-label">Máx. Usos</label>
+                                        <input type="number" min="1" className="form-input" value={editCred.max_uses} onChange={e => setEditCred(p => p ? { ...p, max_uses: parseInt(e.target.value) || 1 } : p)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Usos Atuais</label>
+                                        <input type="number" min="0" className="form-input" value={editCred.current_uses} onChange={e => setEditCred(p => p ? { ...p, current_uses: parseInt(e.target.value) || 0 } : p)} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Status</label>
+                                        <select className="form-input" value={editCred.is_used ? 'used' : 'available'} onChange={e => setEditCred(p => p ? { ...p, is_used: e.target.value === 'used' } : p)}>
+                                            <option value="available">Disponível</option>
+                                            <option value="used">Esgotada</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {editCred.product && (
+                                    <div style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                        🔗 Vinculada: <strong style={{ color: 'var(--text-primary)' }}>{editCred.product.name}</strong>
+                                        {editCred.variation && <> → {editCred.variation.name}</>}
+                                    </div>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setEditCred(null)}>Cancelar</button>
+                                    <button type="submit" className="btn btn-primary">Salvar</button>
                                 </div>
                             </form>
                         </div>
