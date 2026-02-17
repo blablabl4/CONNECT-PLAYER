@@ -304,28 +304,30 @@ export default function AdminProductsPage() {
                                                 </div>
 
                                                 {/* Row: Name + Price + Duration */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                                                     <div>
                                                         <label className="form-label" style={{ fontSize: '0.8rem' }}>Nome *</label>
                                                         <input type="text" className="form-input" required placeholder="Ex: Privado, Compartilhado" value={v.name} onChange={e => handleVarChange(i, 'name', e.target.value)} />
                                                     </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$) *</label>
-                                                        <input type="number" step="0.01" className="form-input" required placeholder="0.00" value={v.price} onChange={e => handleVarChange(i, 'price', parseFloat(e.target.value) || 0)} />
-                                                    </div>
-                                                    <div>
-                                                        <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
-                                                        <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVarChange(i, 'duration', e.target.value)}>
-                                                            <option value="30 dias">30 dias</option>
-                                                            <option value="60 dias">60 dias</option>
-                                                            <option value="90 dias">90 dias</option>
-                                                            <option value="Vitalício">Vitalício</option>
-                                                        </select>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Preço (R$) *</label>
+                                                            <input type="number" step="0.01" className="form-input" required placeholder="0.00" value={v.price} onChange={e => handleVarChange(i, 'price', parseFloat(e.target.value) || 0)} />
+                                                        </div>
+                                                        <div>
+                                                            <label className="form-label" style={{ fontSize: '0.8rem' }}>Duração</label>
+                                                            <select className="form-input" value={v.duration || '30 dias'} onChange={e => handleVarChange(i, 'duration', e.target.value)}>
+                                                                <option value="30 dias">30 dias</option>
+                                                                <option value="60 dias">60 dias</option>
+                                                                <option value="90 dias">90 dias</option>
+                                                                <option value="Vitalício">Vitalício</option>
+                                                            </select>
+                                                        </div>
                                                     </div>
                                                 </div>
 
                                                 {/* Row: Credential Selector */}
-                                                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                                                <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
                                                     <label className="form-label" style={{ fontSize: '0.8rem' }}>🔗 Credencial vinculada</label>
                                                     <select className="form-input" value={v.credential_id || ''} onChange={e => handleVarChange(i, 'credential_id', e.target.value)}>
                                                         <option value="">Selecione uma credencial...</option>
@@ -345,11 +347,13 @@ export default function AdminProductsPage() {
                                                         if (!cred) return null;
                                                         const remaining = cred.max_uses - cred.current_uses;
                                                         return (
-                                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', fontSize: '0.8rem', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                                                                <span style={{ color: 'var(--text-muted)' }}>📧 {cred.email || '—'}</span>
-                                                                <span style={{ color: 'var(--text-muted)' }}>🔑 {cred.password ? '••••••' : '—'}</span>
-                                                                <span style={{ color: 'var(--text-muted)' }}>🔗 {cred.link ? 'Sim' : '—'}</span>
-                                                                <span style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>📦 {remaining} uso(s) restante(s) (max: {cred.max_uses})</span>
+                                                            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '0.8rem' }}>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>📧 {cred.email || '—'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>🔑 {cred.password ? '••••••' : '—'}</span>
+                                                                    <span style={{ color: 'var(--text-muted)' }}>🔗 {cred.link ? 'Sim' : '—'}</span>
+                                                                    <span style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>📦 {remaining}/{cred.max_uses} usos</span>
+                                                                </div>
                                                             </div>
                                                         );
                                                     })()}
